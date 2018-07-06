@@ -14,3 +14,12 @@ A FASTQ file normally uses four lines per sequence.
 
 ### Programs
 gzip cutadapt fastqc samtools bowtie2 hisat2 rsem (this comes with a few programs) R Python
+
+### Packages 
+#### cutadapt
+Cutadapt finds and removes adapter sequences, primers, poly-A tails and other types of unwanted sequence from your high-throughput sequencing reads.
+  
+    pip install --user --upgrade cutadapt
+or 
+    
+    conda install -c bioconda cutadapt
