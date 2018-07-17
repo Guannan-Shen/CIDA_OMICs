@@ -11,7 +11,8 @@ A FASTQ file normally uses four lines per sequence.
 2. 2nd line is the raw sequence letters.
 3. 3rd line begins with a '+' character and is optionally followed by the same sequence identifier (and any description) again.
 4. 4th line encodes the quality values for the sequence in Line 2, and must contain the same number of symbols as letters in the sequence.
-
+### Statistics and Algo
+1. [Poisson GLM](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/Poisson%20GLM.md)
 ### Programs
 gzip cutadapt fastqc samtools bowtie2 hisat2 rsem (this comes with a few programs) R Python
 
