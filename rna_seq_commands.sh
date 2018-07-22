@@ -106,10 +106,46 @@ sed '/^$/d' ~/my1stproj/bucket/index/hum_index/hg38.tmp.fa > ~/my1stproj/bucket/
 awk '/^>chr/' hg38.cleaned.fa #should only get chr1-22, chrM, chrX, and chrY
 
 #chromosome sizes
+# try to get the hg38.chrom.sizes.txt from the website
 awk '!/GL|KI|alt/' ~/my1stproj/bucket/index/hum_index/hg38.chrom.sizes.txt > ~/my1stproj/bucket/index/hum_index/hg38.cleaned.chrom.sizes
 
+## the genome are prefared, hg38.cleaned.fa
+
+## Load the transcriptome 
+gunzip Homo_sapiens.GRCh38.93.gtf.gz
+## prepare the clean .gtf/ transcriptome
+## remove random contigs from gtf file - downloaded from Ensembl 
+awk '$1 !~"GL"' ~/my1stproj/bucket/index/hum_index/Homo_sapiens.GRCh38.93.gtf | awk '$1 !~"KI"' - | awk '$1 !~"#"' - > ~/my1stproj/bucket/index/hum_index/Homo-sapiens.GRCh38.93.cleaned.gtf
+
+## add 'chr' to chromosome names (to match UCSC genome sequence)
+sed -i 's/^/chr/' ~/my1stproj/bucket/index/hum_index/Homo-sapiens.GRCh38.93.cleaned.gtf 
+
+## make mitochondrial chromosome name match UCSC genome sequence
+sed -ri 's/chrMT/chrM/g' ~/my1stproj/bucket/index/hum_index/Homo-sapiens.GRCh38.93.cleaned.gtf 
+
+## check to make sure this worked. The chromosome names should matcht those from above
+cut -c 1-5  Homo-sapiens.GRCh38.93.cleaned.gtf  | sort | uniq
+
+## Prepare the reference genome and transcriptome
+## prepare reference
+## mkdir under index
+mkdir ~/my1stproj/bucket/index/RSEM
+rsem-prepare-reference --bowtie2 --gtf ~/my1stproj/bucket/index/hum_index/Homo-sapiens.GRCh38.93.cleaned.gtf ~/my1stproj/bucket/index/hum_index/hg38.cleaned.fa ~/my1stproj/bucket/index/RSEM/hg38.ensembl 
+
+## it takes about 50 mins in our case, for about 14 raw dataset
 ## transfer files to local after this 
 
+## Step 4b.
+## RSEM. In this step the the call rsem-calculate-expression 
+## will map reads to the reference tramscriptome, and quantify reads all in the same program.
+## Using counts for downstream analysis
+## using the folder quantitation
+## the most time consuming step
+mkdir ~/my1stproj/bucket/quantitation/rsem_hg38
+cd ~/my1stproj/bucket/quantitation/rsem_hg38
+
+##run rsem-calculate-expression
+python3 ~/my1stproj/bucket/code/runRSEM_batch.py --rsem-time --rsem-seedLen 20 --rsem-seed 2110 --rsem-bowtie2 --rsem-noBam --rsem-fwProb 1.0 --unpaired -d _R -o ~/my1stproj/bucket/quantitation/rsem_hg38 -i trimmed.fastq.gz ~/my1stproj/bucket/trimmedReads ~/my1stproj/bucket/index/RSEM hg38.ensembl 16
 
 
 
