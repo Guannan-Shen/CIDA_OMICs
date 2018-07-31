@@ -27,11 +27,15 @@ or
 ### Google Cloud Computing  (GCP)
 1. Find [my handbook](https://github.com/Guannan-Shen/Tutorial/tree/R/Google_Cloud)
 2. SFTP via FileZilla to get files from the sever, similar with `mv` file to somewhere, to the local hard drive `D:/01_CIDA/Training/my1stproj/`.
-3. Files (**For differential expression analysis**):  
+3. Command Line to copy files from the Google Cloud
+  * from a terminal on your local machine cd into the directory where you hace the gc_rsa ssh key `cd ~/.ssh`
+  * `chmod 400 gc_rsa`
+  * `scp -i gc_rsa sheng@104.198.109.11:~/my1stproj/bucket/quantitation/rsem_hg38/*.genes.results  D:/01_CIDA/Training/my1stproj/genes_results/` [scp command reference](https://www.garron.me/en/articles/scp.html)
+4. Files (**For differential expression analysis**):  
   * `countSummary.txt`in `~/my1stproj/bucket/rawReads/` for summary table
   * `trimmedSummary.txt` in `~/my1stproj/bucket/trimmedReads/` for summary table 
   * `*fastqc.html` in `~/my1stproj/bucket/trimmedReads/` for quick raw data quality evaluation
-  * `*.rsem.out` in `~/my1stproj/bucket/quantitation/rsem_hg38/` to make `alignmentSummary.txt` using the [alignmentSum.sh](https://github.com/Guannan-Shen/Tutorial/blob/R/Linux_Bash/alignmentSum.sh)
-  * `alignmentSummary.txt` in `~/my1stproj/bucket/quantitation/rsem_hg38/` for summary table 
+  * `*.rsem.out` in `~/my1stproj/bucket/quantitation/rsem_hg38/` to make `alignmentSummary.txt` using the [alignmentSum.sh](https://github.com/Guannan-Shen/Tutorial/blob/R/Linux_Bash/alignmentSum.sh) (run the bash code under the folder which you want to put the alignmentSummary.txt in)
+  * `alignmentSummary.txt` in `~/my1stproj/bucket/quantitation/rsem_hg38/` for summary table
   * `*.genes.results` in `~/my1stproj/bucket/quantitation/rsem_hg38/` for expected count matrix, you also need `sampleList` to get the **sampleID vector** (such as N29, N47, T245DG), get the output saved as `cnts.RData` by Rstudio. 
   * `Ensembl.humanGenes.GRCh38.p7.txt` in **Ensembl**
