@@ -38,4 +38,8 @@ or
   * `*.rsem.out` in `~/my1stproj/bucket/quantitation/rsem_hg38/` to make `alignmentSummary.txt` using the [alignmentSum.sh](https://github.com/Guannan-Shen/Tutorial/blob/R/Linux_Bash/alignmentSum.sh) (run the bash code under the folder which you want to put the alignmentSummary.txt in)
   * `alignmentSummary.txt` in `~/my1stproj/bucket/quantitation/rsem_hg38/` for summary table
   * `*.genes.results` in `~/my1stproj/bucket/quantitation/rsem_hg38/` for expected count matrix, you also need `sampleList` to get the **sampleID vector** (such as N29, N47, T245DG), get the output saved as `cnts.RData` by Rstudio. 
-  * `Ensembl.humanGenes.GRCh38.p7.txt` in **Ensembl**
+  * `Ensembl.humanGenes.GRCh38.p12.txt` downloaded from **[Ensembl Biomart](http://uswest.ensembl.org/biomart/martview/e2d9a3812e652144df2bde5ec222c02b)**
+    * Select "Ensembl Genes 93".
+    * Select "Human Genes".
+    * Select attributes (it depends on the context), might include: gene stable ID, transcript stable ID, gene description, chromosome/scaffold name, Gene start, Gene end, strand, Transcript start, Transcript end, Gene name, Transcript name, Gene type and Transcript name. 
+    * Select "results" tab and download TSV using "go" tab.
