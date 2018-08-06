@@ -24,6 +24,8 @@ Cutadapt finds and removes adapter sequences, primers, poly-A tails and other ty
 or 
     
     conda install -c bioconda cutadapt
+#### DESeq2 and RUVSeq for differential expression analysis
+Install from [biocLite](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/RNAseq_DEanalysis.Rmd)
 ### Google Cloud Computing  (GCP)
 1. Find [my handbook](https://github.com/Guannan-Shen/Tutorial/tree/R/Google_Cloud)
 2. SFTP via FileZilla to get files from the sever, similar with `mv` file to somewhere, to the local hard drive `D:/01_CIDA/Training/my1stproj/`.
