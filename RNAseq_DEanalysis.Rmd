@@ -1,0 +1,21 @@
+---
+title: "RNAseq_DEanalysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff=60), tidy = TRUE)
+getwd()
+```
+
+```{r DE package, echo=TRUE,warning=FALSE, message=FALSE, prompt=TRUE}
+source("https://bioconductor.org/biocLite.R")
+biocLite("DESeq2")
+biocLite('RUVSeq')
+install.packages('tidyverse')
+```
+
+
+
