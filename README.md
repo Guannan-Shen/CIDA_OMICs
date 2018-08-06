@@ -45,5 +45,5 @@ Install from [biocLite](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/R
     * Select "Human Genes".
     * Select attributes (it depends on the context), might include: gene stable ID, transcript stable ID, gene description, chromosome/scaffold name, Gene start, Gene end, strand, Transcript start, Transcript end, Gene name, Transcript name, Gene type and Transcript name. 
     * Select "results" tab and download TSV using "go" tab.
-    ## DE analysis
-    1. Normalization by R in [Rmarkdown](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/testproj_NDGSG.Rmd)
+## DE analysis
+1. Normalization by R in [Rmarkdown](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/testproj_NDGSG.Rmd)
