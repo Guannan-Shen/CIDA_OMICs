@@ -1,0 +1,64 @@
+---
+title: "N_DG_SG_DE"
+author: "Guannan Shen"
+date: "August 6, 2018"
+output:
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
+---
+This program Takes the user through the process of filtering and normalizing RNA-Seq expected counts data to performing a simple differential expression analysis and generating a table of candidate genes. It will begin by reading in the raw expected count matrix which was generated using the protocol and code in 'RNASeq.BioinformaticProcessing.Rmd' and 'RNASeq.ExpectedCountBuild.Rmd', or for the combined files use 'healthystart.rnaseq.msc.Rmd'. Before we begin it is important to note that the following protocol is somewhat nuanced in that there is not a consensus yet on the best methods for RNA-Seq normalization. We will use a number of diagnostics to get an idea of what the data looks like, and try to pick the methods and tools that perform best. This protocol will not always be the same and most of the parameters we will use during this process will vary depending in the sample size and original data.  
+Data input:  D:/01_CIDA/Training/my1stproj/genes_results/cnts.RData
+             D:/01_CIDA/Training/my1stproj/genes_results/Ensembl.humanGenes.GRCh38.p12.txt
+             Data frame of 
+File output: 
+
+```{r setup, echo=TRUE, message=FALSE, warning=FALSE, prompt=TRUE, tidy=TRUE, include=FALSE}
+######################
+## Set up workspace
+######################
+rm(list = ls())
+options(stringsAsFactors = F)
+library(rmarkdown)
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+knitr::opts_chunk$set(engine = "R")
+getwd()
+library(DESeq2)
+library(RUVSeq)
+'%!in%' <- function(x,y)!('%in%'(x,y))
+```
+
+The first step is to filter the dataset. Right now it includes all the gene IDs from the annotation used in RSEM. This will total somewhere around 58,000. This is far too many to do any analysis, and many of these will not be present, especially if the original sequencing was polyA selected. The first filtering step I use is to remove any gene that has less than an average of 10 reads across all samples. We want to end up somewhere around 15 - 20 thousand genes in the final dataset. We can use more conservative filtering criteria if the above doesn't remove enough. For example, a gene must have a minimum of 10 reads in each sample. Also, As this will be a normalization precursor to a differential expression analysis, I will have to assign samples to a 'phantom' treatment group. This dataset doesn't actually have 2 groups. For a more formal analysis Dr. Debelea has suggested using maternal BMI (as a categorical variable) as a good phenotype to use as a group measure (i.e. obese and not obese).  
+
+```{r QC plots, echo=TRUE, message=FALSE, warning=FALSE, prompt=TRUE, tidy=TRUE}
+## Load raw data
+load('D:/01_CIDA/Training/my1stproj/genes_results/cnts.RData')
+# fetch standard sample names 
+rna.pid <- sapply(strsplit(colnames(cnts), split = "_", fixed = TRUE), FUN = function(x) x[1])
+paste(rna.pid)
+## change column names to match the sample IDs in pheno dataset, standard sample names
+colnames(cnts) <- rna.pid
+dim(cnts)
+##filter the raw data and check dim
+cnts_f <- cnts[rowSums(cnts)>(10*ncol(cnts)), ]
+## should end up around 15 - 20K genes 
+paste("The number of remaining genes: ", dim(cnts_f)[1], sep = '')
+
+```
+
+
+
+
+
+
