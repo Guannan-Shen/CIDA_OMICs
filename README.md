@@ -1,4 +1,4 @@
-# CIDA_OMICs
+# CIDA_OMICs, RNAseq for DE analysis (differential expression analysis)
 ## Description
 Generally, the RNAseq data analysis (differential expression analysis) via google cloud computing and R.  
 For a simple standard pipeline, using standard RNAseq data for a differential expression analysis (DE analysis). 
@@ -24,7 +24,7 @@ Cutadapt finds and removes adapter sequences, primers, poly-A tails and other ty
 or 
     
     conda install -c bioconda cutadapt
-#### DESeq2 and RUVSeq for differential expression analysis
+#### DESeq2 and RUVSeq for differential expression analysis (DE analysis)
 Install from [biocLite](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/RNAseq_DEanalysis.Rmd)
 ### Google Cloud Computing  (GCP)
 1. Find [my handbook](https://github.com/Guannan-Shen/Tutorial/tree/R/Google_Cloud)
@@ -45,3 +45,5 @@ Install from [biocLite](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/R
     * Select "Human Genes".
     * Select attributes (it depends on the context), might include: gene stable ID, transcript stable ID, gene description, chromosome/scaffold name, Gene start, Gene end, strand, Transcript start, Transcript end, Gene name, Transcript name, Gene type and Transcript name. 
     * Select "results" tab and download TSV using "go" tab.
+    ## DE analysis
+    1. Normalization by R in [Rmarkdown](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/testproj_NDGSG.Rmd)
