@@ -15,7 +15,7 @@ output:
     toc_depth: 5
   word_document:
     toc: yes
-    toc_depth: '
+    toc_depth: '5'
 ---
 
 ```{r setup, include=FALSE}
