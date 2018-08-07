@@ -17,11 +17,20 @@ output:
     toc: yes
     toc_depth: '5'
 ---
-This program Takes the user through the process of filtering and normalizing RNA-Seq expected counts data to performing a simple differential expression analysis and generating a table of candidate genes. It will begin by reading in the raw expected count matrix which was generated using the protocol and code in 'RNASeq.BioinformaticProcessing.Rmd' and 'RNASeq.ExpectedCountBuild.Rmd', or for the combined files use 'healthystart.rnaseq.msc.Rmd'. Before we begin it is important to note that the following protocol is somewhat nuanced in that there is not a consensus yet on the best methods for RNA-Seq normalization. We will use a number of diagnostics to get an idea of what the data looks like, and try to pick the methods and tools that perform best. This protocol will not always be the same and most of the parameters we will use during this process will vary depending in the sample size and original data.  
-Data input:  D:/01_CIDA/Training/my1stproj/genes_results/cnts.RData
-             D:/01_CIDA/Training/my1stproj/genes_results/Ensembl.humanGenes.GRCh38.p12.txt
-             Data frame of 
-File output: 
+
+# Summary
+## Tutorials
+This program Takes the user through the process of filtering and normalizing RNA-Seq expected counts data to performing a simple differential expression analysis and generating a table of candidate genes. It will begin by reading in the raw expected count matrix which was generated using the protocol and code in 'RNASeq.BioinformaticProcessing.Rmd' and 'raw_read_counts_test.Rmd'. 
+
+## Warnings
+Before we begin it is important to note that the following protocol is somewhat nuanced in that there is not a consensus yet on the best methods for RNA-Seq normalization. We will use a number of diagnostics to get an idea of what the data looks like, and try to pick the methods and tools that perform best. This protocol will not always be the same and most of the parameters we will use during this process will vary depending in the sample size and original data.  
+**Data input:**  
+1. D:/01_CIDA/Training/my1stproj/genes_results/cnts.RData  
+2. D:/01_CIDA/Training/my1stproj/genes_results/Ensembl.humanGenes.GRCh38.p12.txt  
+3. Data frame of the sample groups: pheno  
+**File output:**  
+
+## Packages & Setup
 
 ```{r setup, echo=TRUE, message=FALSE, warning=FALSE, prompt=TRUE, tidy=TRUE, include=FALSE}
 ######################
@@ -39,7 +48,8 @@ library(RUVSeq)
 '%!in%' <- function(x,y)!('%in%'(x,y))
 ```
 
-The first step is to filter the dataset. Right now it includes all the gene IDs from the annotation used in RSEM. This will total somewhere around 58,000. This is far too many to do any analysis, and many of these will not be present, especially if the original sequencing was polyA selected. The first filtering step I use is to remove any gene that has less than an average of 10 reads across all samples. We want to end up somewhere around 15 - 20 thousand genes in the final dataset. We can use more conservative filtering criteria if the above doesn't remove enough. For example, a gene must have a minimum of 10 reads in each sample. Also, As this will be a normalization precursor to a differential expression analysis, I will have to assign samples to a 'phantom' treatment group. This dataset doesn't actually have 2 groups. For a more formal analysis Dr. Debelea has suggested using maternal BMI (as a categorical variable) as a good phenotype to use as a group measure (i.e. obese and not obese).  
+# Preprocess: Filter, as.factor() and General QC images 
+The first step is to filter the dataset. Right now it includes all the gene IDs from the annotation used in RSEM. This will total somewhere around 58,000. This is far too many to do any analysis, and many of these will not be present, especially if the original sequencing was polyA selected. The first filtering step I use is to remove any gene that has less than an average of 10 reads across all samples. We want to end up somewhere **around 15 - 20 thousand genes** in the final dataset. We can use more conservative filtering criteria if the above doesn't remove enough. For example, a gene must have a minimum of 10 reads in each sample. Also, As this will be a normalization precursor to a differential expression analysis, I will have to assign samples to a 'phantom' treatment group. This dataset doesn't actually have 2 groups. For a more formal analysis Dr. Debelea has suggested using maternal BMI (as a categorical variable) as a good phenotype to use as a group measure (i.e. obese and not obese).  
 
 ```{r QC plots, echo=TRUE, message=FALSE, warning=FALSE, prompt=TRUE, tidy=TRUE}
 ## Load raw data
@@ -51,14 +61,127 @@ paste(rna.pid)
 colnames(cnts) <- rna.pid
 dim(cnts)
 ##filter the raw data and check dim
-cnts_f <- cnts[rowSums(cnts)>(10*ncol(cnts)), ]
+cnts_f <- cnts[rowSums(cnts)>=(9*ncol(cnts)), ]
 ## should end up around 15 - 20K genes 
-paste("The number of remaining genes: ", dim(cnts_f)[1], sep = '')
+ngenes <- nrow(cnts_f)
+paste("The number of remaining genes: ", ngenes, sep = '')
+
+## create the sample group data frame pheno
+## from dim() we know there are 14 samples
+pheno <- data.frame(pid = rna.pid, txt = as.factor(c(rep("Normal", 2), 
+                                                     rep("TumorDG", 3), 
+                                                     rep(c('TumorDG', 'TumorSG'),2),
+                                                     rep('TumorDG', 5))))
+pheno$txt <- relevel(pheno$txt, "Normal") ## This is an important step so that DESeq will know to treat the Normal cell group as the reference
+
+# using the function from EDASeq
+set <- newSeqExpressionSet(as.matrix(round(cnts_f)),phenoData = data.frame(group=as.factor(pheno$txt), row.names=colnames(cnts_f)))
+##  general QC images  ## 
+## plotRLE from EDASeq
+plotRLE(set, 
+        outline = FALSE, col=c(rep("Blue", 2), 
+                               rep("Red", 3), 
+                               rep(c('Red', 'Green'),2),
+                               rep('Red', 5)), 
+        main = "Normal vs. Tumor Cell RLE Plot", 
+        xlab = "Sample", 
+        ylab = "Relative Log Ratio")
+## PCA plot to show clustering
+### plotPCA from EDASeq package
+
+plotPCA(set, col=c(rep("Blue", 2), 
+                   rep("Red", 3), 
+                   rep(c('Red', 'Green'),2),
+                   rep('Red', 5)))
+
+
+
 
 ```
 
+# Normalization by RUVSeq
+## Empirical Control Genes
+We want   
+1. the medians for each of the samples to be lined up and at 0.00.  
+2. We also want the spread (i.e. the range of the bars) to be as small as possible without over normalizing.  
+As I said in the beginning this will be a judgement call and will require the user to examine many different plots. You will also want to see clustering by treatment group in the PCA plot. For this tutorial we will use **RUV normalization**.  
+First, we need to do a first pass at the differential expression analysis in order to get our empirical control genes. In the past I have just used the least significant (25% of dataset) genes.
 
+```{r empirical control genes, echo=TRUE, message=FALSE, warning=FALSE}
+# counts from EDASeq (DESeq2)
+# pData is phenoData from Biobase
+countData <- counts(set) #Matrix with transcripts IDs as rows and sample IDs as columns
+colData <- pData(set) #Vector of type list in which the group column is the treat/control identfier, and the rownames are sample IDs
+#Run DESeq function using above objects
+dds <- DESeqDataSetFromMatrix(countData = counts(set), colData = pData(set),design = ~ group)
+dds <- DESeq(dds)
+res <- results(dds)
 
+top <- res[order(res$pvalue),] #Order from most significant to least significant based on p-value
+## Emperical are the least significant 25% of genes
+emp <- round(ngenes - (ngenes*.25))
+empirical <- rownames(set)[which(!(rownames(set) %in% rownames(top)[1:emp]))]
+```
 
+## parameters for RUV normalization.
+Once we have the empirical control genes, we can use the RUVg function with a range of nuisance factors (i.e. K) to determine which is the best set of parameters for RUV normalization. This chunk of code will produce a number of plots.  
+1. First it will produce RLE plots for the original data.  
+2. And then another RLE plot after removing each nuisance factor (i.e. from k = 1 to k = 10). 
+3. Weight the importance of IQR higher than the median
+Remember, we want the medians for each of the samples to be lined up and at 0.00. We also want the spread (i.e. the range of the bars) to be as small as possible without over normalizing.  
+In this case I would pick k = 5. To help make this decision more empirical, we also plot the median and IQR for the normalizations with each k value. **The best k value is where the 'elbow' is in the graph.** For this data this is at 5 which conforms what we saw in the RLE plots. Now, in a dataset with a 2 group comparison we would like to see a clear clustering of samples by treatment group in the PCA plots at the same k = 5. We don't see that in this data because there are no treatment groups. Not surprisingly, we see no clustering at any K. For the purposes of this tutorial we will pick a nuisance factor of 5 to use for normalization.
 
+```{r parameters, echo=FALSE, warning=FALSE, message=FALSE}
+## you will want t change this directory so you can write the plots
+print("code is hidden")
+plotD <- "D:/01_CIDA/Training/my1stproj/graphics/"
+RUV.ks <- 1:10
+v <- u <- rep(NA, length(RUV.ks))
+for(k in RUV.ks){
+  set.k <- RUVg(x = set, cIdx = empirical, k = k)
+  count.k <- normCounts(set.k)
+  meds.k <- apply(count.k, 2, quantile, .5)
+  interq.k <- apply(count.k, 2, quantile, .75) - apply(count.k, 2, quantile, .25)
+  v[k] <- sd(meds.k)
+  u[k] <- sd(interq.k)
+  
+  Outline <- FALSE; Ylim <- c(-1, 1); Col <- c(rep("Blue", 2), 
+                                               rep("Red", 3), 
+                                               rep(c('Red', 'Green'),2),
+                                               rep('Red', 5))
+  pdf(paste0(plotD, "HS_RUVgRLE_k", k, ".pdf"),
+      width = 30, height = 20)
+  par(mfrow = c(2,1), cex.main = 4)
+  plotRLE(set, outline = Outline, ylim = Ylim, col = Col,
+            main = "Before RUVg")
 
+  plotRLE(set.k, outline = Outline, ylim = Ylim, col = Col,
+          main = paste0("RLE Plot after RUVg (k=", k, ")"))
+
+  # legend("bottom", horiz = TRUE, cex = 3, text.col = goldcolors[c(1, 4:5)], bty = "n", legend = paste0("GOLD ", c(0, 3:4)))
+  dev.off() #???
+  
+  pdf(paste0(plotD, "HS_PCA_K", k, ".pdf"), width = 10, height = 10)
+  plotPCA(set.k, col=c(rep("Blue", 2), 
+                   rep("Red", 3), 
+                   rep(c('Red', 'Green'),2),
+                   rep('Red', 5)), 
+          main = paste0("PCA Plot after RUVg (k=", k, ")"))
+  dev.off()
+}
+
+pdf(paste0(plotD, "MedInterQuarSD.pdf"), 
+    width = 10, height = 10)
+par(mar = c(5, 5, 2, 5))
+plot(RUV.ks, v, type = "b", xlab = "k", ylab = "sd(median)", col = "blue",
+     main = "Median and IQR Plot")
+par(new = TRUE)
+plot(RUV.ks, u, axes = FALSE, type = "b", xlab = NA, ylab = NA, col = "green")
+axis(side = 4)
+mtext(side = 4, line = 3, "sd(inter-quartile range)")
+legend("topright", legend = c("median", "inter-quartile"), pch = 1, lty = 1,
+       col = c("blue", "green"), bty = "n")
+dev.off()
+```
+
+## Normalize data using RUVSeq
