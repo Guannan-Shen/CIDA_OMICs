@@ -29,6 +29,8 @@ Before we begin it is important to note that the following protocol is somewhat 
 2. D:/01_CIDA/Training/my1stproj/genes_results/Ensembl.humanGenes.GRCh38.p12.txt  
 3. Data frame of the sample groups: pheno  
 **File output:**  
+1. D:/01_CIDA/Training/my1stproj/genes_results/cnts.norm.RData  
+2. D:/01_CIDA/Training/my1stproj/graphics/
 
 ## Packages & Setup
 
@@ -129,11 +131,11 @@ Once we have the empirical control genes, we can use the RUVg function with a ra
 2. And then another RLE plot after removing each nuisance factor (i.e. from k = 1 to k = 10). 
 3. Weight the importance of IQR higher than the median
 Remember, we want the medians for each of the samples to be lined up and at 0.00. We also want the spread (i.e. the range of the bars) to be as small as possible without over normalizing.  
-In this case I would pick k = 5. To help make this decision more empirical, we also plot the median and IQR for the normalizations with each k value. **The best k value is where the 'elbow' is in the graph.** For this data this is at 5 which conforms what we saw in the RLE plots. Now, in a dataset with a 2 group comparison we would like to see a clear clustering of samples by treatment group in the PCA plots at the same k = 5. We don't see that in this data because there are no treatment groups. Not surprisingly, we see no clustering at any K. For the purposes of this tutorial we will pick a nuisance factor of 5 to use for normalization.
+In this case I would pick k = 5. To help make this decision more empirical, we also plot the median and IQR for the normalizations with each k value. **The best k value is where the 'elbow' is in the graph.** For this data this is at 5 which conforms what we saw in the RLE plots. Now, in a dataset with a 2 group comparison we would like to see a clear clustering of samples by treatment group in the PCA plots at the same k = 5. For the purposes of this tutorial we will pick a nuisance factor of 5 to use for normalization.
 
-```{r parameters, echo=FALSE, warning=FALSE, message=FALSE}
+```{r parameters, echo=TRUE, warning=FALSE, message=FALSE}
 ## you will want t change this directory so you can write the plots
-print("code is hidden")
+print("code is hidden, PREVIOUSLY")
 plotD <- "D:/01_CIDA/Training/my1stproj/graphics/"
 RUV.ks <- 1:10
 v <- u <- rep(NA, length(RUV.ks))
@@ -185,3 +187,49 @@ dev.off()
 ```
 
 ## Normalize data using RUVSeq
+```{r RUV Normalization, echo=TRUE, message=FALSE, warning=FALSE}
+#create second expression (count) data that has been RUV normalized.
+# K= 5 was chosen here based on the median-IDRsd plot and the PCA plot
+#  at K=5 the sample data points are linear separable in PC-1 and PC-2 plots
+set2 <- RUVg(set, empirical, k=5)
+### NOTE: Do not use this for any real analysis for healthy start projects. I have normalized based on the presence of treatment groups that do not exist. This was for educational purposes only.
+save(set2, file="D:/01_CIDA/Training/my1stproj/genes_results/cnts.norm.RData")
+
+```
+
+### Some Notes:
+RUV is really meant for removing batch effects, and may not always be the best option for data sets where there are no batches. I like to examine the clustering before normalization to see if this is necessary. For this I will use PCA plots and dendrograms where clustering is based on the 1-Pearson(correlation).  
+I will look for clustering of known groups (e.g. treatment group, sex, etc). If the data clusters well to begin with, I would not recommend using RUV normalization as it could over normalize causing you to miss differentially expressed genes in the down stream analysis.  
+Other normalizations that can be used when not using a negative binomial modeler like DESEq2 (for example when you look at the dendrograms) are rlog() or vst(). rlog() is the preferred method because it takes into account library size, however it can be very computationally intensive with datasets of large sample size. It may take many hours or not complete at all. In these cases the user may want to try the vst() normalization.  
+
+### Dendrogram
+Below is an example of the code used to generate a dendrogram. I use the vst normalization for this tutorial because it is faster than the rlog, but in practice I would try rlog first.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+library(WGCNA)
+library(RColorBrewer)
+## rlog and vst() from DESeq2
+cnts.rlog <- rlog(as.matrix(round(cnts_f)))
+cnts.vst <- vst(as.matrix(round(cnts_f)))
+
+# create hierarchical clustering, hclust from basic stats
+content.hclust = hclust(as.dist(1-cor(cnts.vst, method="pearson")))
+
+colors = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2"))
+colors4plot <- c(rep("Blue", 2), 
+                   rep("Red", 3), 
+                   rep(c('Red', 'Green'),2),
+                   rep('Red', 5))
+colors4plot <- as.matrix(colors4plot)
+colnames(colors4plot) <- "Treatment Group"
+
+#plot the dendrogram with a color bar underneath that in this example case corresponds to batch 
+pdf("D:/01_CIDA/Training/my1stproj/graphics/HS_Dendrogram.pdf", height = 8, width = 10)
+## function plots a hierarchical clustering dendrogram from WGCNA
+plotDendroAndColors(dendro=content.hclust, colors=colors4plot, main="Normal vs. Tumor Hierachical Clustering", ylab="1-Pearson Correlation",cex.dendroLabels = 0.45)
+dev.off()
+```
+
+
+
+
