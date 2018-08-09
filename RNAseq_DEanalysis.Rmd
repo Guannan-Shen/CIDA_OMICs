@@ -29,6 +29,11 @@ getwd()
 source("https://bioconductor.org/biocLite.R")
 biocLite("DESeq2")
 biocLite('RUVSeq')
+## GO.db is for package WGCNA for dendrogram
+biocLite('GO.db')          
+biocLite('impute') 
+biocLite('preprocessCore') 
+
 install.packages('tidyverse')
 ```
 
