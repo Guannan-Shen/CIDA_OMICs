@@ -115,14 +115,35 @@ First, we need to do a first pass at the differential expression analysis in ord
 countData <- counts(set) #Matrix with transcripts IDs as rows and sample IDs as columns
 colData <- pData(set) #Vector of type list in which the group column is the treat/control identfier, and the rownames are sample IDs
 #Run DESeq function using above objects
+head(counts(set))
+head(pData(set))
+print("this is a single factor: group, and 3 groups design (3 levels)")
+
 dds <- DESeqDataSetFromMatrix(countData = counts(set), colData = pData(set),design = ~ group)
 dds <- DESeq(dds)
-res <- results(dds)
+
+## to set the contrast
+print(resultsNames(dds))
+
+## or for two groups, res <- results(dds)
+res <- results(dds, contrast=c("group","TumorDG","Normal"))
+res1 <- results(dds, contrast = c(0,1,0))
+
+## res <- results(dds, contrast = list(c("group_TumorDG_vs_Normal"),c("Intercept")))
+
+head(res[order(res$pvalue),],10)
+head(res1[order(res1$pvalue),],10)
 
 top <- res[order(res$pvalue),] #Order from most significant to least significant based on p-value
 ## Emperical are the least significant 25% of genes
 emp <- round(ngenes - (ngenes*.25))
 empirical <- rownames(set)[which(!(rownames(set) %in% rownames(top)[1:emp]))]
+
+## plot counts from DESeq
+##useful to examine the counts of reads for a single gene across the groups
+plotCounts(dds, gene=which.min(res$padj), intgroup="group")
+plotCounts(dds, gene=which.max(res$padj), intgroup="group")
+
 ```
 
 ## parameters for RUV normalization.
@@ -191,9 +212,13 @@ dev.off()
 #create second expression (count) data that has been RUV normalized.
 # K= 5 was chosen here based on the median-IDRsd plot and the PCA plot
 #  at K=5 the sample data points are linear separable in PC-1 and PC-2 plots
-set2 <- RUVg(set, empirical, k=5)
+set2 <- RUVg(set, empirical, k=4)
+print("k=4 is for TumorDG vs Normal comparison")
+
 ### NOTE: Do not use this for any real analysis for healthy start projects. I have normalized based on the presence of treatment groups that do not exist. This was for educational purposes only.
 save(set2, file="D:/01_CIDA/Training/my1stproj/genes_results/cnts.norm.RData")
+
+
 
 ```
 
@@ -205,31 +230,60 @@ Other normalizations that can be used when not using a negative binomial modeler
 ### Dendrogram
 Below is an example of the code used to generate a dendrogram. I use the vst normalization for this tutorial because it is faster than the rlog, but in practice I would try rlog first.
 
-```{r, echo=TRUE, message=FALSE, warning=FALSE}
+```{r Dendrogram, echo=TRUE, message=FALSE, warning=FALSE}
 library(WGCNA)
+allowWGCNAThreads(8)
 library(RColorBrewer)
 ## rlog and vst() from DESeq2
+# rlog() This function transforms the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size. 
+
 cnts.rlog <- rlog(as.matrix(round(cnts_f)))
 cnts.vst <- vst(as.matrix(round(cnts_f)))
 
 # create hierarchical clustering, hclust from basic stats
 content.hclust = hclust(as.dist(1-cor(cnts.vst, method="pearson")))
 
+## using rlog()
+content.hclust_log <- hclust(as.dist(1-cor(cnts.rlog, method="pearson")))
+
+## prepare colors for the plot
 colors = c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2"))
 colors4plot <- c(rep("Blue", 2), 
                    rep("Red", 3), 
                    rep(c('Red', 'Green'),2),
                    rep('Red', 5))
 colors4plot <- as.matrix(colors4plot)
-colnames(colors4plot) <- "Treatment Group"
+colnames(colors4plot) <- "Cell Group"
 
 #plot the dendrogram with a color bar underneath that in this example case corresponds to batch 
 pdf("D:/01_CIDA/Training/my1stproj/graphics/HS_Dendrogram.pdf", height = 8, width = 10)
 ## function plots a hierarchical clustering dendrogram from WGCNA
-plotDendroAndColors(dendro=content.hclust, colors=colors4plot, main="Normal vs. Tumor Hierachical Clustering", ylab="1-Pearson Correlation",cex.dendroLabels = 0.45)
+plotDendroAndColors(dendro=content.hclust, colors=colors4plot, main="Normal vs. Tumor Hierachical Clustering", ylab="1-Pearson Correlation",cex.dendroLabels = 0.8)
 dev.off()
+
+#plot the dendrogram with rlog() normalized data
+pdf("D:/01_CIDA/Training/my1stproj/graphics/HS_Dendrogram_log.pdf", height = 8, width = 10)
+## function plots a hierarchical clustering dendrogram from WGCNA
+plotDendroAndColors(dendro=content.hclust_log, colors=colors4plot, main="Normal vs. Tumor Hierachical Clustering", ylab="1-Pearson Correlation",cex.dendroLabels = 0.8)
+dev.off()
+
+print("cnts.rlog data has smaller pearson correlations, overall")
 ```
 
 
+## Differential expresiion analysis
+
+**Differential expression with DESeq2**  
+
+We will use the DESeq2 package for differential expression analysis. For a simple analysis we need only a few functions.  
+1. DESeqDataSetFromMatrix: generates the design matrix to be used in the analysis. Notice that for this I have included the 4 nuisance variables from the RUV normalization, and of course the group variable.  
+2. DESeq: performs the differential expression and calculates fold changes.  
+3. results: formats the dds output into a nicely readable dataframe.  
+If you would like to merge the results with the annotation dataset you may do so.
+
+```{r DE, echo=TRUE, message=FALSE, warning=FALSE}
+anno <- read.table(file="D:/01_CIDA/Training/my1stproj/genes_results/Ensembl.humanGenes.GRCh38.p12.txt",sep="\t",header=TRUE, quote = "")
+head(anno, 4)
 
 
+```
