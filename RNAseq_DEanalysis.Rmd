@@ -29,6 +29,7 @@ getwd()
 source("https://bioconductor.org/biocLite.R")
 biocLite("DESeq2")
 biocLite('RUVSeq')
+biocLite('limma')     # linear models for Microarray data, for continuous data not discrete counts
 ## GO.db is for package WGCNA for dendrogram
 biocLite('GO.db')          
 biocLite('impute') 
