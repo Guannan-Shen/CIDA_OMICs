@@ -48,7 +48,7 @@ Install from [biocLite](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/R
 ## DE analysis
 1. Normalization by R in [Rmarkdown](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/testproj_NDGSG.Rmd)
 2. [DESeq2 tutorials](https://github.com/Guannan-Shen/CIDA_OMICs/blob/master/DESeq2_tutorial.Rmd)  
-You need:
+You need, in R:
     
-    source("https://bioconductor.org/biocLite.R")
-    biocLite("airway")
+        source("https://bioconductor.org/biocLite.R")  
+        biocLite("airway")
