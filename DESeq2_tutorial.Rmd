@@ -53,7 +53,11 @@ Newer and faster alternative pipeline is to use **transcript abundance quantific
 The computational analysis of an RNA-seq experiment begins from the FASTQ files that contain the nucleotide sequence of each read and a quality score at each position. These reads must first be aligned to a reference genome or transcriptome, or the abundances and estimated counts per transcript can be estimated without alignment, as described above. In either case, it is important to know if the sequencing experiment was **single-end or paired-end**. 
 
 
-```{r}
+```{r airway alignments, echo=TRUE, message=FALSE, warning=FALSE, prompt=TRUE, tidy=TRUE}
+library(airway)
+
+
+
 ```
 
 ## References
