@@ -1,5 +1,5 @@
 ---
-title: "N_DG_SG_DE"
+title: "Test Proj Tumor"
 author: "Guannan Shen"
 date: "August 6, 2018"
 output:
@@ -47,6 +47,7 @@ knitr::opts_chunk$set(engine = "R")
 getwd()
 library(DESeq2)
 library(RUVSeq)
+library(magrittr)
 '%!in%' <- function(x,y)!('%in%'(x,y))
 ```
 
@@ -75,6 +76,10 @@ pheno <- data.frame(pid = rna.pid, txt = as.factor(c(rep("Normal", 2),
                                                      rep(c('TumorDG', 'TumorSG'),2),
                                                      rep('TumorDG', 5))))
 pheno$txt <- relevel(pheno$txt, "Normal") ## This is an important step so that DESeq will know to treat the Normal cell group as the reference
+
+## or pipe operator
+
+## pheno$txt %<>% relevel("Normal")
 
 # using the function from EDASeq
 set <- newSeqExpressionSet(as.matrix(round(cnts_f)),phenoData = data.frame(group=as.factor(pheno$txt), row.names=colnames(cnts_f)))
