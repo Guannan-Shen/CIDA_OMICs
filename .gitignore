@@ -17,3 +17,4 @@ DataProcessed/
 .DS_Store
 # the history Rstudio Proj
 .Rhistory
+.Rproj.user
