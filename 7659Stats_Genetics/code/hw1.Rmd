@@ -3,17 +3,17 @@ title: "7659HW1"
 author: "Guannan Shen"
 date: "September 17, 2018"
 output: 
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
   html_document:
     number_sections: yes
     theme: united
     toc: yes
     toc_depth: 5
     toc_float: yes
-  pdf_document:
-    latex_engine: lualatex
-    number_sections: yes
-    toc: yes
-    toc_depth: 5
   word_document:
     toc: yes
     toc_depth: '5'
@@ -31,8 +31,69 @@ getwd()                                          ## get the path work directory
 ```{r ss calculation, warning=FALSE}
 library(readr)
 library(pwr)
+library(ssize)
+library(samr)
+library(tidyverse)
+## sample size calculation 
+# Include the assumptions, null and alternative
+# hypothesis, statistical test and expected number of false positives.
+# alpha = 0.001, beta = 0.05, 0.10, 0.15, 0.20, diff = 1 and sigma = 0.50 based on log2 scale
+# 20,000 probe sets
+# Design and Analysis of DNA Microatray Investigations, equation 3.2
+beta <- c(0.20, 0.15, 0.10, 0.05)
+m_ssize <- sapply(beta, function(b){
+  n = 4*(qnorm(0.001/2, 0, 1)+qnorm(b/2, 0, 1))^2/(1/0.5)^2
+  return(ceiling(n))
+})
+fal_po <- 0.001*20000
+m_ssize <- c(m_ssize, fal_po)
+Power_Levels <- c("0.8", "0.85", "0.9", "0.95", "False Positive (No.)")
+m_ssize <- data.frame(`Power Levels` = Power_Levels, `Sample Size` = m_ssize)
+row.names(m_ssize) <- c("alpha = 0.001", "delta = 1 (log2)", "sigma = 0.5 (log2)", "", " ")
+kable(m_ssize, caption = "Two-group Microarray Sample Size Summary",
+      row.names = TRUE, col.names = c("Power Levels", "Sample Size"),
+      align = "c")
+
 
 ```
 
 ```{r ss comparison, warning=FALSE}
+# sample size comparison 
+# pwr
+pwr_ss <-  c(pwr.t.test(d = 1/0.5, sig.level = 0.001, power = 0.8)$n,
+             pwr.t.test(d = 1/0.5, sig.level = 0.001, power = 0.95)$n)
+ceiling(pwr_ss)
+pwr.t.test(d = 1/0.5, sig.level = 0.001, power = 0.8)    
+paste("there is no pi0 in pwr.t.test")
+
+# ssize 
+power.t.test.FDR(sd = 0.5, delta = 1, FDR.level = 0.05, power = 0.8,
+                 pi0 = 0.8,  type="two.sample", alternative="two.sided")
+power.t.test.FDR(sd = 0.5, delta = 1, FDR.level = 0.05, power = 0.95,
+                 pi0 = 0.9,  type="two.sample", alternative="two.sided")
+power.t.test.FDR(sd = 0.5, delta = 1, FDR.level = 0.05, power = 0.95,
+                 pi0 = 0.8,  type="two.sample", alternative="two.sided")
+power.t.test.FDR(sd = 0.5, delta = 1, FDR.level = 0.05, power = 0.8,
+                 pi0 = 0.9,  type="two.sample", alternative="two.sided")
+paste("pi0 proportion of non-differentially expressed genes")
+
+# pooled standard deviations for question 3
+sdvalues <- read.table("~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW1/sdvalues.txt", quote="\"", comment.char="")
+ggplot(sdvalues, aes(sdvalues[,2]))+
+  geom_histogram(bins = 1000) +
+  theme_bw() +
+  labs(x = "Pooled s.d.")
+ggsave("hist_sd.png", dpi = 300)
+sdsize <- ssize(sd = sdvalues[,2], delta = 1, sig.level = 0.001, power = 0.8, alpha.correct = "None")
+png(filename = "sdsize.png")
+ssize.plot(sdsize, marks = c(4,10,20))
+dev.off()
+# e samr
+x <-  as.matrix(read.table("~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW1/arraydata.txt", row.names = 1, header = TRUE))
+data <-  list(x=x,y=c(rep(1,4),rep(2,4)), geneid=row.names(x), 
+              genenames = row.names(x), logged2 = TRUE)
+samr.obj <- samr(data, resp.type="Two class unpaired", nperms=100)
+png("samr.png")
+samr.assess.samplesize.plot(samr.assess.samplesize(samr.obj, data, dif = 1, samplesize.factors = c(2,3,4,5)))
+dev.off()
 ```
