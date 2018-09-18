@@ -43,7 +43,7 @@ library(tidyverse)
 beta <- c(0.20, 0.15, 0.10, 0.05)
 m_ssize <- sapply(beta, function(b){
   n = 4*(qnorm(0.001/2, 0, 1)+qnorm(b/2, 0, 1))^2/(1/0.5)^2
-  return(ceiling(n))
+  return(ceiling(n/2))
 })
 fal_po <- 0.001*20000
 m_ssize <- c(m_ssize, fal_po)
@@ -51,7 +51,7 @@ Power_Levels <- c("0.8", "0.85", "0.9", "0.95", "False Positive (No.)")
 m_ssize <- data.frame(`Power Levels` = Power_Levels, `Sample Size` = m_ssize)
 row.names(m_ssize) <- c("alpha = 0.001", "delta = 1 (log2)", "sigma = 0.5 (log2)", "", " ")
 kable(m_ssize, caption = "Two-group Microarray Sample Size Summary",
-      row.names = TRUE, col.names = c("Power Levels", "Sample Size"),
+      row.names = TRUE, col.names = c("Power Levels", "Sample Size per Group"),
       align = "c")
 
 
