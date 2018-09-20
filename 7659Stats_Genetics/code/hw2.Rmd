@@ -1,0 +1,80 @@
+---
+title: "7659 HW2"
+author: "Guannan Shen"
+date: "September 20, 2018"
+output:
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
+---
+
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+## setting working directory
+opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+# Quality Control
+1. Install the affy and simpleaffy packages from Bioconductor.  
+2. Download the CEL files directory from Canvas.  
+3. These data are from human cell lines treated with low or high levels of a treatment.  
+4. The meta-data is provided in targets.txt in the celfiles directory.
+
+## a. read in CEL files 
+Read the 8 CEL files in the directory celfiles using the following functions from the affy package:
+
+```{r affy data, warning=TRUE, tidy=TRUE, background= 'red'}
+library(affy)
+library(simpleaffy)
+# get the working directory
+getwd()
+# the pheno Data
+pd <- read.AnnotatedDataFrame("targets.txt", header = TRUE, row.names = 1, as.is =TRUE)
+# the affy data, READ CEL files into Affybatch
+affy_data <- ReadAffy(filenames=pData(pd)$FileName, phenoData=pd, sampleNames=sampleNames(pd))
+
+## extracting information
+head(exprs(affy_data), 6)
+## sampleNames are the same 
+sampleNames(pd)
+sampleNames(affy_data)
+## probeNames
+head(probeNames(affy_data), 6)
+## mm mismatch
+head(mm(affy_data),6)
+## pm perfect match 
+head(pm(affy_data),6)
+
+# 
+pData(affy_data)
+pData(pd)
+
+## use message not cat()
+message("exprs() & mm() & pm() \n& probeNames() \nis not for AnnotateDataFrame 'pd' ")
+
+
+```
+
+```{r affy plot, warning=FALSE}
+par(mfrow = c(1,2))
+image(affy_data)
+
+```
+

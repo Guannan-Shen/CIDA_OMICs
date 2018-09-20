@@ -1,0 +1,117 @@
+---
+title: "R Markdown Tutorial"
+author: "Mikaela Miller"
+date: "Sunday, January 04, 2015"
+output: word_document
+---
+# Introduction 
+
+This document serves as a short introduction to R Markdown.  R Markdown can be used to generate reports that adhere to reproducible research initiatives, capturing computer code, datasets, methods, protocols and results in a single document. The following highlights many of the basic commands.  
+
+## Resources
+
+The links below are helpful references to get started in R Markdown:
+
+  * http://rmarkdown.rstudio.com/authoring_basics.html
+  * https://www.youtube.com/watch?v=YcJb1HBc-1Q
+
+# Using Rmarkdown
+
+There are two basic modes for R Markdown: Pandoc Markdown and R code chunks. Pandoc Markdown is where you will write the body of the report.  
+
+Remember, always save your R Markdown file.  To generate the report, click on the "Knit ____" icon in the menu bar of the Rmd window.
+
+## Pandoc
+
+You can control different aspects of the text in Pandoc Markdown (size, italic, bullet points, etc.). Below are some examples. 
+
+Emphasis
+
+*italic*   **bold**
+
+_italic_   __bold__
+
+Headers
+
+# Header 1
+
+## Header 2
+
+### Header 3
+
+Lists
+
+Unordered List:
+
+* Item 1
+* Item 2
+    + Item 2a
+    + Item 2b
+    
+Ordered List:
+
+1. Item 1
+2. Item 2
+3. Item 3
+    + Item 3a
+    + Item 3b
+
+
+
+## R code chunks
+The execution of R code in Markdown is accomplished with R code chunks. You can embed the code and make it visible or hide it (which is useful when the code generates a table or graph).  Names can be given to each code chunk for navigation. Results can be cached to speed up processing time.
+
+Generally, I like to make sure the code is working correctly by making an R Script in a separate file.  I then copy and paste the code chunks into the R Markdown file.
+
+The most useful and frequently used commands:
+
+* message=F (will hide any messages that are produced when the code is executed)
+* warning=F (will hide any warnings that are produced when the code is executed)
+* cache=T (caches results to speed up processing)
+* echo=F (hides the code chunk, in the case you are creating a graphic)
+* results="asis" (what I have found to be the best option for tables and graphics)
+
+
+
+# Example Analysis Workflow
+
+The remainder of the document runs through an example workflow. 
+
+```{r qplot, fig.width=4, fig.height=3, message=FALSE}
+# quick summary and plot
+library(ggplot2)
+summary(cars)
+qplot( speed, dist, data=cars)
+```
+
+
+## Adding images to the R Markdown report
+
+To add an immage from a file, you can use the following code and packages.  The image file must be in the working directory location. Replace the file location below with the location of an image you want to add. 
+
+```{r, image, echo=F, eval=T, message=F, cache=F}
+library(png)
+library(grid)
+img1 <- readPNG("RStudio-Ball.png")
+grid.raster(img1)
+```
+
+#### References
+
+You can cite R packages with the following code:
+
+```{r, citations, echo=F, message=F}
+citation("png")
+```
+
+
+#### Session Information
+
+The session information contains the versions of R and all packages used in the analysis contained in your R Markdown file.
+
+```{r, results='show', echo=F}
+MA.session = sessionInfo(package = NULL)
+print(MA.session)
+```
+
+
