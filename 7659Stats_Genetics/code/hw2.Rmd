@@ -23,8 +23,10 @@ output:
 require("knitr")
 opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
 opts_chunk$set(engine = "R")
-## setting working directory
-opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+## setting working directory in asus 
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+## setting working directory in ubuntu
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -72,9 +74,59 @@ message("exprs() & mm() & pm() \n& probeNames() \nis not for AnnotateDataFrame '
 
 ```
 
-```{r affy plot, warning=FALSE}
+## b. Plot the raw microarray images using image() on the object Data. Comment on what you see in these plots.
+This study is to compare the gene expression between two groups via microarray experiment. There are 4 samples in each group, 8 chips in total. From the .CEL file, we can get some ideas of the quality of the raw image .DAT file.  
+The
+```{r affy plot1, warning=FALSE}
 par(mfrow = c(1,2))
 image(affy_data)
 
+
 ```
 
+## c. Plot quality control metrics using qc.affy() and plot.qc.stats() from the simpleaffy package.
+The QC stats plot reports quality control parameters for the chips. 
+
+```{r qccontrol, warning=FALSE}
+plot.qc.stats(qc.affy(affy_data))
+```
+
+## d. Plot the mean intensity from 3’ to 5’ end of the target mRNA using AffyRNAdeg() and plotAffyRNAdeg().
+
+"High1", "High2", "High3" ,"High4", "Low1" , "Low2",  "Low3",  "Low4"
+c("red","orange","orange","orange","light blue","light blue","green","black")
+
+```{r affyRNA, warning=FALSE}
+AffyRNAdeg(affy_data)$sample.names
+plotAffyRNAdeg(AffyRNAdeg(affy_data), cols = 
+                 c("red","orange","orange","orange","light blue","light blue","green","black"))
+# "High1", "High2", "High3" ,"High4", "Low1" , "Low2",  "Low3",  "Low4"
+```
+
+## e. Use boxplot() and plotDensity.AffyBatch() to examine the distribution of intensity values for the perfect-match and mis-match probes separately.
+
+```{r pmmm, warning=FALSE}
+str(affy_data)
+boxplot(log2(pm(affy_data)), main = "The intensity of perfect-match", ylab= "log2(Intensity)")
+boxplot(log2(mm(affy_data)), main = "The intensity of mis-match", ylab= "log2(Intensity)")
+plotDensity.AffyBatch(affy_data, which = "pm", xlab = "log intensity of perfect-match",
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+plotDensity.AffyBatch(affy_data, which = "mm", xlab = "log intensity of mis-match", 
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+```
+
+## f. Based on the summaries and figures you generated, would you recommend that one or more chips be removed from the analysis?
+
+# Normalization
+## (a) Create log transformed data and plot the density before and after log transforming using plotDensity.AffyBatch. Comment on these plots.
+
+```{r norm, warning=FALSE}
+plotDensity.AffyBatch(affy_data, which = "both", log = FALSE, 
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+plotDensity.AffyBatch(affy_data, which = "both", 
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+
+par(mfrow=c(1,2))
+MAplot(affy_data)
+
+```
