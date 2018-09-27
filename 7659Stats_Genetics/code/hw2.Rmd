@@ -3,6 +3,9 @@ title: "7659 HW2"
 author: "Guannan Shen"
 date: "September 20, 2018"
 output:
+  word_document:
+    toc: yes
+    toc_depth: '5'
   pdf_document:
     latex_engine: lualatex
     number_sections: yes
@@ -14,9 +17,6 @@ output:
     toc: yes
     toc_depth: 5
     toc_float: yes
-  word_document:
-    toc: yes
-    toc_depth: '5'
 ---
 
 ```{r setup, include=FALSE, cache = FALSE}
@@ -24,9 +24,9 @@ require("knitr")
 opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
 opts_chunk$set(engine = "R")
 ## setting working directory in asus 
-## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+ opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
 ## setting working directory in ubuntu
-opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -51,11 +51,6 @@ getwd()
 pd <- read.AnnotatedDataFrame("targets.txt", header = TRUE, row.names = 1, as.is =TRUE)
 # the affy data, READ CEL files into Affybatch
 affy_data <- ReadAffy(filenames=pData(pd)$FileName, phenoData=pd, sampleNames=sampleNames(pd))
-
-## groups and samples, subseting
-affy_normal <- get.array.subset.affybatch(affy_data, "Target", 
-                                          c("High","High","High","High","Low","Low","Low"))
-plot.qc.stats(qc.affy(affy_normal))
 
 
 ## extracting information
@@ -85,8 +80,8 @@ This study is to compare the gene expression between two groups via microarray e
 The first impression is the black background on each chip. On average, it seems like the background of the "High" group is darker than the "Low" group. What's more, the "High" group has better quality, overall. Because there is neither big dard clot nor obvious aggregated white dot exits and all four chips looks similar. The "Low" group has more within group variability. "Low 1" has several grey clots, although that obvious. "Low 3" seems to have lighter backgroud. The last but not the least, the plot of "Low 4" suggests this chip was defective. This chip has one big dark clot, which makes that area has equal intensity, and the left upper side also exists a vertical black line, which forces that area becomes the black background.  
 In summary, these plots suggest there is a problem in the quality of the "Low" group, which requires further quality control diagnostic.  
 ```{r affy plot1, warning=FALSE}
-par(mfrow = c(1,2))
-image(affy_data)
+# par(mfrow = c(1,2))
+# image(affy_data)
 
 
 ```
@@ -259,10 +254,6 @@ morethan_one <- apply(pma_call,1, function(x) {
 
 # this is the number of probesets pass the filter
 sum(morethan_one)
-
-
-head(pma_call,10)
-head(morethan_one, 10)
 
 # get the reduced data
 # the pheno Data
