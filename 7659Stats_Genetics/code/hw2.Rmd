@@ -3,28 +3,30 @@ title: "7659 HW2"
 author: "Guannan Shen"
 date: "September 20, 2018"
 output:
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
   html_document:
     number_sections: yes
     theme: united
     toc: yes
     toc_depth: 5
     toc_float: yes
-  pdf_document:
-    latex_engine: lualatex
-    number_sections: yes
-    toc: yes
-    toc_depth: 5
-  word_document:
-    toc: yes
-    toc_depth: '5'
 ---
 
 ```{r setup, include=FALSE, cache = FALSE}
 require("knitr")
 opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
 opts_chunk$set(engine = "R")
-## setting working directory
-opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+## setting working directory in asus 
+ opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+## setting working directory in ubuntu
+## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -50,6 +52,7 @@ pd <- read.AnnotatedDataFrame("targets.txt", header = TRUE, row.names = 1, as.is
 # the affy data, READ CEL files into Affybatch
 affy_data <- ReadAffy(filenames=pData(pd)$FileName, phenoData=pd, sampleNames=sampleNames(pd))
 
+
 ## extracting information
 head(exprs(affy_data), 6)
 ## sampleNames are the same 
@@ -72,9 +75,219 @@ message("exprs() & mm() & pm() \n& probeNames() \nis not for AnnotateDataFrame '
 
 ```
 
-```{r affy plot, warning=FALSE}
-par(mfrow = c(1,2))
-image(affy_data)
+## b. Plot the raw microarray images using image() on the object Data. Comment on what you see in these plots.
+This study is to compare the gene expression between two groups via microarray experiment. There are 4 samples in each group, 8 chips in total. From the .CEL file, we can get some ideas of the quality of the raw image .DAT file.  
+The first impression is the black background on each chip. On average, it seems like the background of the "High" group is darker than the "Low" group. What's more, the "High" group has better quality, overall. Because there is neither big dard clot nor obvious aggregated white dot exits and all four chips looks similar. The "Low" group has more within group variability. "Low 1" has several grey clots, although that obvious. "Low 3" seems to have lighter backgroud. The last but not the least, the plot of "Low 4" suggests this chip was defective. This chip has one big dark clot, which makes that area has equal intensity, and the left upper side also exists a vertical black line, which forces that area becomes the black background.  
+In summary, these plots suggest there is a problem in the quality of the "Low" group, which requires further quality control diagnostic.  
+```{r affy plot1, warning=FALSE}
+# par(mfrow = c(1,2))
+# image(affy_data)
+
 
 ```
 
+## c. Plot quality control metrics using qc.affy() and plot.qc.stats() from the simpleaffy package.
+The QC stats plot reports quality control parameters for the chips. Each array is represented by a seperate row in the figure. In short, everything in the figure should be blue and red highlights a problem.   
+On the left hand side of the plot, "%" represents the percentage of genes called present on each array. The blue color means the "present%" are within 10% of each other.It means the percentages of present are close. The red number below each "present%" represents the average background. They are colored red, means there is more than 20 units different among those average background values. Basically, we expect the "present%" and average background to be similar. The central black vertical line corresponding to 0 fold change, the dotted lines on each side represent 3 fold up and down changes. The blue region represents the three-fold change in scale factor of each chip, within these 8 chips, 1.5 fold up and down. The blue bars indicate all chips are in safe scaling region and comparable. The triangle and circle represent beta-actin and GAPDH, house-keeping genes, respectively. Affy state that beta actin should be within 3, gapdh around 1. Blue means these values are in the good region. It is interesting that, the "High 1" sample has the most different overall expression intensity. 
+In summary, less experimental variation among these chips, the better quality they have. 
+
+```{r qccontrol, warning=FALSE}
+plot.qc.stats(qc.affy(affy_data), label = c("High 1", "High 2", "High 3" ,"High 4",
+                                            "Low 1" , "Low 2",  "Low 3",  "Low 4"))
+```
+## In the following graphs, the color scheme is as following:
+"High1", "High2", "High3" ,"High4", "Low1" , "Low2",  "Low3",  "Low4"  
+c("red","orange","orange","orange","light blue","light blue","green","black")
+## d. Plot the mean intensity from 3’ to 5’ end of the target mRNA using AffyRNAdeg() and plotAffyRNAdeg().
+The RNA digestion plot reports RNA degradation from 5' to 3' end of the genes. Usually, the line goes up as moving towards the 3' end, which indicates more degradation occurs. Ideally, the lines would lie horizontally.  
+In practice, we expect the slopes and profiles of the lines are similar for all chips in the study. However, the plot here suggests there is a overall difference between "High" and "Low" groups. The "Low" group has more RNA degradation occured. This indicates there is system error between these two groups happened during the experiment process. 
+
+
+```{r affyRNA, warning=FALSE}
+AffyRNAdeg(affy_data)$sample.names
+plotAffyRNAdeg(AffyRNAdeg(affy_data), cols = 
+                 c("red","orange","orange","orange","light blue","light blue","green","black"))
+# "High1", "High2", "High3" ,"High4", "Low1" , "Low2",  "Low3",  "Low4"
+```
+## In the following graphs, the color scheme is as following:
+"High1", "High2", "High3" ,"High4", "Low1" , "Low2",  "Low3",  "Low4"  
+c("red","orange","orange","orange","light blue","light blue","green","black")
+## e. Use boxplot() and plotDensity.AffyBatch() to examine the distribution of intensity values for the perfect-match and mis-match probes separately.
+The boxplots and plotDensity just present the same information in two different ways.  
+The comparison between the perfect-match (pm) and mis-match (mm) shows:  
+1. pm has a higher intensity level on average.  
+2. pm has a greater within sample variability, and peaks are wider, larger box and longer tail.
+3. The trend of pm intensity across samples is similar to the trend of mm.  
+The comparison across samples shows:  
+1. The "High 1" (red) has the highest overall intensity.
+2. "Low 4" group has clearly more genes with very low intensity, which is abnormal. This is also shown as the long tail at the left handside on the black dotted curve.
+3. Besides the "Low 4" group, the spreads (variability) of other samples are similar.
+4. Besides the "High 1" group, other medians of intensity are close, around 7 in log2 scale.  
+5. The average intensity of "low" group from low 1 to low 4 are slightly higher than high 2 to high 4.  
+
+```{r pmmm, warning=FALSE}
+str(affy_data)
+boxplot(log2(pm(affy_data)), main = "The intensity of perfect-match", ylab= "log2(Intensity)")
+boxplot(log2(mm(affy_data)), main = "The intensity of mis-match", ylab= "log2(Intensity)")
+plotDensity.AffyBatch(affy_data, which = "pm", xlab = "log intensity of perfect-match",
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+plotDensity.AffyBatch(affy_data, which = "mm", xlab = "log intensity of mis-match", 
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+```
+
+## f. Based on the summaries and figures you generated, would you recommend that one or more chips be removed from the analysis?
+I would recommend to remove the "Low 4" group. This chip is clearly defective (.CEL picture) and result in abnormal intensity values (Intensity plots). Thus, comparing this chip to others is biased. 
+
+
+# Normalization
+
+## In the following graphs, the color scheme is as following:
+"High1", "High2", "High3" ,"High4", "Low1" , "Low2",  "Low3",  "Low4"  
+c("red","orange","orange","orange","light blue","light blue","green","black")
+
+## (a) Create log transformed data and plot the density before and after log transforming using plotDensity.AffyBatch. Comment on these plots.
+Without log transformation, the density plots are not readable. Because, majority of genes are at relatively low intensity level, but there are still a decent amount of genes have extreme high intensity.  
+After the log2 transformation, the lines are distinguishable. The average intensities of "low" group from low 1 to low 4 are slightly higher than high 2 to high 4. Among those 8 lines, the red line, "High 1" has clearly much higher average intensity than others. The peaks of low group are relatively sharper. The concave shape in the black dotted line (low 4) and the long tail at the left handside indicate some error in this chip. 
+
+## (b)
+From the median/IQR and the shape of the MA plots, the first thing should be noticed that "Low 4" sample has abnormal pattern, indicating artificial error, which is a big problem. The variance (IQR) of "high" group is greater than "Low" group, which means higher variability in the former group. The median intensity in samples high 2 to high 4 are consistently lower than the median of the  "Low" group. The shapes are different between these two groups. Generally, the "high" group are more spread out vertically when the average intensity is lower. 
+
+```{r norm, warning=FALSE}
+plotDensity.AffyBatch(affy_data, which = "both", log = FALSE, 
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+plotDensity.AffyBatch(affy_data, which = "both", 
+                      col = c("red","orange","orange","orange","light blue","light blue","green","black"))
+
+par(mfrow=c(1,2))
+MAplot(affy_data, cex = 0.8)
+
+```
+
+## Using expresso(), try different normalize.method options 
+
+### When using (quantiles, loess, constant)
+As we talked in the journal club 2, the quantiles normalization method should be the most aggressive method. In my case, I chose background correction method, RMA, which is widely used in Affymetrix chip. RMA convolution method is to correct the background through the empirical distribution of probe intensities. Summary method is average difference summarization, which is the most commonly used. On each probe set, this method take the average difference between the perfect-match and mis-match. I just use PM only (no correction).  
+Compare with un-normalized and other methods, the quantiles normalization gives the most clean normalization, which means all medians and all variance within each sample are quite close. In terms of similar medians and variance, the loess method is the second best method. Meanwhile, the constant normalization can make all medians similar, but the difference in the variance is more obvious, compared with other methods.
+
+### summary.method options (avgdiff, mas, medianpolish), keeping the other arguments set
+Summarization is the process that combine the multiple probe intensities for each probe set to generate an expression measurement.  
+I used the best normalization method, quantiles for later comparison; background correction method, RMA; PM only (no correction). Three different summary methods are average difference, median polish (RMA) and MAS 5.0. Median polish is using RMA convolution linear model. MAS 5.0 method is using ((PM-MM)/(PM+MM)). MAS option gives a similar result as the average difference method, since both methods share similar underlying math equation. The median polish fits linear model in log2 scale, thus the scale of y-axis are different in this option. Besides the scale, the distribution of the intensity under this option is much more symmetric compared with other two summary methods. 
+
+### perfect-match correction method
+Quantiles method, RMA background correction, summary method is average difference.  
+Subtract mm is just to subtract mis-match from perfect-match to do the correction. The idea of MAS 5.0 is mentioned above. Since the set of RMA method is the best. So I used RMA for background correction.  
+The subtractmm and MAS methods are compatible only with the MAS background correction method; that is, it does not make sense to combine these with RMA background correction. (Preferred analysis methods for Affymetrix GeneChips revealed by a wholly defined control dataset, 2005). What we observed here matches the conclusion from this paper. The intensities are normalized and all samples share similar pattern. However, the long tail around 0 intensity in the boxplot is weird, making variance of all samples stays large as un-normalized data. So PM only (no correction) is the best option in my case. 
+
+```{r normal, warning=FALSE}
+# compare different normalize.method
+par(mfrow = c(1,2))
+boxplot(log2(exprs(affy_data)), main = "Un-normalized")
+## the quantiles 
+norm_quan <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "avgdiff" , 
+         pmcorrect.method = "pmonly", normalize.method = "quantiles" )
+boxplot(log2(exprs(norm_quan)),  main = "quantiles normalized avgdiff pmonly")
+
+## the loess 
+norm_loess <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "avgdiff" , 
+         pmcorrect.method = "pmonly", normalize.method = "loess" )
+boxplot(log2(exprs(norm_loess)),  main = "loess normalized avgdiff pmonly")
+
+## constant
+norm_cons <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "avgdiff" , 
+         pmcorrect.method = "pmonly", normalize.method = "constant" )
+boxplot(log2(exprs(norm_cons)),  main = "constant normalized avgdiff pmonly")
+
+## try summary method 
+## mas 
+quan_mas <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "mas" , 
+         pmcorrect.method = "pmonly", normalize.method = "quantiles" )
+boxplot(log2(exprs(quan_mas)),  main = "quantiles normalized, mas")
+## medianpolish 
+quan_me <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "medianpolish" , 
+         pmcorrect.method = "pmonly", normalize.method = "quantiles" )
+boxplot(log2(exprs(quan_me)),  main = "quantiles normalized, medianpolish")
+
+## try pmcorrect.method
+quan_mas <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "avgdiff" , 
+         pmcorrect.method = "mas", normalize.method = "quantiles" )
+boxplot(log2(exprs(quan_mas)),  main = "quantiles normalized, mas")
+
+quan_sub <- expresso(affy_data, bgcorrect.method = "rma", summary.method = "avgdiff" , 
+         pmcorrect.method = "subtractmm", normalize.method = "quantiles" )
+boxplot(log2(exprs(quan_sub)),  main = "quantiles normalized, subtractmm")
+
+
+```
+
+## d. Get present and absent calls Mas 5.0 using mas5calls()
+The number of probesets have at least one present call in each of the two groups is 25726.  
+  
+    ## present call
+    pma_call<- exprs(mas5calls(affy_data))
+    morethan_one <- apply(pma_call,1, function(x) { 
+      High = sum(x[1:4]== "P")
+      Low = sum(x[5:8] == "P")
+      if(High >= 1 & Low >= 1)
+      {call = 1}
+      else{call = 0}
+    return(call)
+    })
+
+    # this is the number of probesets pass the filter
+    sum(morethan_one)
+
+## (e) If you think there are any problematic chip(s) based on your quality 
+I removed the "Low 4" sample. The .CEL image plot of "Low 4" sample shows there are contaminants in the raw image file. As I mentioned above, the big clot and black line in the image are unacceptable. The boxplot and density plot also show that there are amout of genes have very low intensity, which are abnormal. Particularly, the MA plot shows unusual pattern in the "Low 4" sample. All of these show that this sample is defective.  
+
+```{r rma}
+library(tidyverse)
+## present call
+pma_call<- exprs(mas5calls(affy_data))
+morethan_one <- apply(pma_call,1, function(x) { 
+  High = sum(x[1:4]== "P")
+  Low = sum(x[5:8] == "P")
+  if(High >= 1 & Low >= 1)
+  {call = 1}
+  else{call = 0}
+  return(call)
+})
+
+# this is the number of probesets pass the filter
+sum(morethan_one)
+
+# get the reduced data
+# the pheno Data
+pd_r <- read.AnnotatedDataFrame("targets_reduced.txt", header = TRUE, row.names = 1, as.is =TRUE)
+# the affy data, READ CEL files into Affybatch
+affy_data_reduced <- ReadAffy(filenames=pData(pd_r)$FileName, phenoData=pd_r, sampleNames=sampleNames(pd_r))
+
+# normalize the data 
+rma_norm <- rma(affy_data_reduced, normalize = TRUE, background = TRUE)
+
+## let the reduced data pass the filter
+ex_norm <- exprs(rma_norm)
+
+pma_norm_call <- exprs(mas5calls(affy_data_reduced))
+
+pre_one <- apply(pma_norm_call,1, function(x) { 
+  High = sum(x[1:4]== "P")
+  Low = sum(x[5:7] == "P")
+  if(High >= 1 & Low >= 1)
+  {call = 1}
+  else{call = 0}
+  return(call)
+})
+
+# filter present call
+pma_norm_call <- data.frame(pma_norm_call)
+pma_norm_call$present <- pre_one
+pma_fil <- pma_norm_call %>% filter(present == 1 )
+head(pma_fil, 8)
+## filter intensity
+ex_norm <- data.frame(ex_norm)
+ex_norm$present <- pre_one
+ex_fil <- ex_norm %>% filter(present == 1 )
+head(ex_fil, 8)
+
+
+```
