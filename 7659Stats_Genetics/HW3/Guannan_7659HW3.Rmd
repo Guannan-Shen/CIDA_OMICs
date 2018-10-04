@@ -1,0 +1,168 @@
+---
+title: "7659 HW3"
+author: "Guannan Shen"
+date: "October 4, 2018"
+output: 
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+
+
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+## setting working directory in asus 
+opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
+## setting working directory in ubuntu
+## opts_knit$set(root.dir = "~/Documents/Stats/gitlab/ECCHO_Guannan/Code/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+```{r libs}
+## set up workspace
+library(knitr)
+library(tidyverse)
+library(samr)
+library(impute)
+library(limma)
+library(gtools)
+library(qvalue)
+options(stringsAsFactors = F)
+options(dplyr.width = Inf)
+getwd()
+```
+
+# T-statistics of microarray data
+## 1. For each gene, calculate the fold change between the knock-out and wildtype groups. List the top 10 genes that show the largest fold change (positive or negative). 
+The fold change is calculated by knock-out over wildtype groups. 
+
+```{r ttest1}
+# read in raw data 
+apodata <- read.table("hw3arraydata.txt", header = TRUE)
+dim(apodata)
+aponame <- read.table("hw3genenames.txt", header = FALSE, blank.lines.skip = FALSE)
+dim(aponame)
+colnames(aponame) <- "genenames"
+
+# combine the names and intensity
+ai <- cbind(aponame, apodata)
+
+
+## the raw data is log2 transformed 
+## the fold change is calculated from the subtraction
+ailogratio <- (base::rowSums(ai[,10:17]) - base::rowSums(ai[,2:9]))/8
+aifc <- logratio2foldchange(ailogratio)
+aifc <- data.frame(ai$genenames, aifc)
+
+# test missing data
+kable(apply(ai[, 2:17] ,2, function(x){sum(is.na(x))}), 
+      caption = "Sparsity Summary", col.names = "No. Missing Values")
+
+## find the top10
+kable(head(aifc[order(abs(aifc$aifc), decreasing = TRUE), ], 10), 
+      caption = "Top10 Genes by Fold Change (Knock-out vs. WT)")
+
+
+
+```
+
+## 2. Obtain the p-values from a two sided t-test for differential expression. How many genes are significant at the 0.01 level? List the top 10 genes that have the largest t-statistics and their corresponding p-value. 
+There are 75 genes are significant at the 0.01 level, by gene-level individual t-test.  
+
+```{r ttest2}
+# carry out individual t-tests
+
+indi <- lapply(1:6384, function(row){
+  test = t.test(ai[row, 2:9], ai[row, 10:17], alternative = "two.sided")
+  test.sum = c(ai[row, 1] , test$p.value, test$statistic)
+  test.sum
+})
+
+indi_t <- data.frame(matrix(unlist(indi), ncol = 3, byrow = TRUE))
+colnames(indi_t) <- c("genenames", "pvalue", "tstatistic")
+indi_t <- indi_t %>%mutate(pvalue = as.numeric(pvalue), 
+                           tstatistic = as.numeric(tstatistic))  
+indi_p <- indi_t %>% filter(pvalue <= 0.01)
+dim(indi_p)
+
+kable(head(indi_p[order(abs(indi_p$tstatistic), decreasing = TRUE), ], 10), 
+              caption = "Top10 Genes by gene-level t-test")
+
+                            
+
+```
+
+
+## c. Calculate the **modified** t-statistic and corresponding p-value using the samr package in R used in Homework2. How many genes are significant at the 0.01 level? List the top 10 genes that have the largest **penalized** t-statistics.
+
+```{r samr}
+
+
+```
+
+
+## d. 
+
+```{r limma}
+
+
+
+```
+
+# P-values and Multiple Testing 
+##
+
+```{r permutation}
+```
+
+##
+```{r adjust}
+# the original t-test 1b
+n = nrow(ai)
+head(indi_t, 3)
+
+## the Bonferroni is n*p
+indi_adjust <- indi_t %>% mutate(pBonferroni_FWER = pmin(1, n*pvalue),
+                                 psidak_FWER = (1 - (1- pvalue)^n),
+                                 pholm_FWER = ,
+                                 pBH_FDR = ,
+                                 pBY_FDR)
+
+## check adjusted p-value 
+head(indi_adjust, 3)
+indi_adjust[540, ]
+
+p <- c(0.01, 0.001, 0.002, 0.05)
+o <- order(p)
+ro <- order(o)
+p
+o
+ro
+
+
+```
+
+
+
+
+
+

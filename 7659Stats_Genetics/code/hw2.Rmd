@@ -24,7 +24,7 @@ require("knitr")
 opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
 opts_chunk$set(engine = "R")
 ## setting working directory in asus 
- opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
+opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
 ## setting working directory in ubuntu
 ## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW2/celfiles/")
                                                  
