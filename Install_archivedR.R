@@ -16,3 +16,14 @@ install.packages(pkgs=pkgFile, type="source", repos=NULL)
 
 # Delete package tarball
 unlink(pkgFile)
+
+#########################
+### for Windows
+#########################
+
+# this is to rebuild the package from the github code by devtools and Rtools 
+library(devtools)
+assignInNamespace("version_info", c(devtools:::version_info, list("3.5" = list(version_min = "3.3.0", version_max = "99.99.99", path = "bin"))), "devtools")
+find_rtools() # is TRUE now
+
+install_github("cran/samr")
