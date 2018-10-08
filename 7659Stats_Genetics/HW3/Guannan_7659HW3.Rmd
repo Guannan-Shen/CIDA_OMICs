@@ -136,28 +136,47 @@ kable(head(indi_p[order(abs(indi_p$tstatistic), decreasing = TRUE), ], 10),
 ```{r permutation}
 ## get all numeric 
 ai_com <- as.matrix(apodata)
-
+N <- choose(16, 8)
 ## get the complement vector
 '%nin%' <- Negate('%in%')
+## put the long vector at the first place 
+ai_com[1,][ai_com[1,] %nin% gene1_com[1,] ]
 
+## get the combinations for gene1
 gene1_com <- combinations(16, 8, ai_com[1,], set = FALSE)
-gene1_paired <- apply(gene1_com, 1, function(gene1_com){
-  
-})
 dim(gene1_com)
 
-ai_com[1,][which(!(gene1_com[1,] %in% ai_com[1,]))]
+## get t
+gene1_paired_t <- apply(gene1_com, 1, function(gene1_com){
+   ai_com[1,][ai_com[1,] %nin% gene1_com]
+})
 
-which(gene1_com[1,] %in% ai_com[1,])
-ai[1,]
+gene1_paired <- t(gene1_paired_t)
 
- ai_com[1,][ai_com[1,] %nin% gene1_com[1,] ]
+## test of the combination and its complement
+ai_com[1, ] %in% c(gene1_com[2, ], gene1_paired[2, ])
 
+## the individual t statistic
+indi_t$tstatistic[1]
 
-gene1_com[1,]
-gene1_com[1,]
+# The permutaion t statistic
+gene1 <- cbind(gene1_com, gene1_paired)
 
-gene1_com[2, ] %in% ai[1,-1]
+gene1_t <- sapply(1:6384, function(row){
+  test = t.test(gene1[row, 1:8], ai[row, 9:16], alternative = "two.sided")
+  test$statistic
+})
+## compare the t statistic and get the p-value
+p_gene1 <- sum(abs(gene1_t) > abs(indi_t$tstatistic[1]))/N
+p_gene1
+
+## the p-value of individual t.test
+indi_t$pvalue[1]
+
+## summarise above procedures for gene1 as a function
+combi_p <- function(gene){
+  
+}
 
 
 
