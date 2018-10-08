@@ -41,7 +41,7 @@ opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Ge
 ## set up workspace
 library(knitr)
 library(tidyverse)
-library(samr)
+# library(samr)
 library(impute)
 library(limma)
 library(gtools)
@@ -101,8 +101,10 @@ indi_t <- data.frame(matrix(unlist(indi), ncol = 3, byrow = TRUE))
 colnames(indi_t) <- c("genenames", "pvalue", "tstatistic")
 indi_t <- indi_t %>%mutate(pvalue = as.numeric(pvalue), 
                            tstatistic = as.numeric(tstatistic))  
+head(indi_t$tstatistic)
 indi_p <- indi_t %>% filter(pvalue <= 0.01)
 dim(indi_p)
+indi_p
 
 kable(head(indi_p[order(abs(indi_p$tstatistic), decreasing = TRUE), ], 10), 
               caption = "Top10 Genes by gene-level t-test")
@@ -132,6 +134,33 @@ kable(head(indi_p[order(abs(indi_p$tstatistic), decreasing = TRUE), ], 10),
 ##
 
 ```{r permutation}
+## get all numeric 
+ai_com <- as.matrix(apodata)
+
+## get the complement vector
+'%nin%' <- Negate('%in%')
+
+gene1_com <- combinations(16, 8, ai_com[1,], set = FALSE)
+gene1_paired <- apply(gene1_com, 1, function(gene1_com){
+  
+})
+dim(gene1_com)
+
+ai_com[1,][which(!(gene1_com[1,] %in% ai_com[1,]))]
+
+which(gene1_com[1,] %in% ai_com[1,])
+ai[1,]
+
+ ai_com[1,][ai_com[1,] %nin% gene1_com[1,] ]
+
+
+gene1_com[1,]
+gene1_com[1,]
+
+gene1_com[2, ] %in% ai[1,-1]
+
+
+
 ```
 
 ##
