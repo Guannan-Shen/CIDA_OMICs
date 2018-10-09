@@ -208,14 +208,25 @@ combi_p <- function(gene){
   return(p_gene)
 }
 
-## test run 
-apply(head(ai_com),1, combi_p)
+## test run and system.time
+matrix(apply(head(ai_com),1, combi_p), ncol = 1, byrow = TRUE)
+system.time(matrix(apply(head(ai_com),1, combi_p), ncol = 1, byrow = TRUE))
+## compare with individual p-value
+indi_t$pvalue[1:6]
 
 ```
 
 ```{r fullpermutation, eval = FALSE}
-## using the function 
+## the full permutation 
+p_per <- apply(ai_com, 1, combi_p)
+p_per <- matrix(p_per, ncol = 1, byrow = TRUE)
 
+## p values with genenames
+p_per <- data.frame(ai$genenames, p_per)
+colnames(p_per) <- c("genenames", "pvalue")
+## get the p value 0.01
+p_per_1 <- p_per %>% filter(pvalue <= 0.01)
+write.csv(p_per_1, "permutationP.csv")
 ```
 
 ##
