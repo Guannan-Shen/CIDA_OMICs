@@ -28,9 +28,9 @@ knitr::opts_chunk$set(echo = T)
 knitr::opts_chunk$set(message = F)
 knitr::opts_chunk$set(warning = F)
 ## setting working directory in asus 
-opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
 ## setting working directory in ubuntu
-## opts_knit$set(root.dir = "~/Documents/Stats/gitlab/ECCHO_Guannan/Code/")
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -41,7 +41,7 @@ opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Ge
 ## set up workspace
 library(knitr)
 library(tidyverse)
-# library(samr)
+library(samr)
 library(impute)
 library(limma)
 library(gtools)
@@ -135,50 +135,86 @@ kable(head(indi_p[order(abs(indi_p$tstatistic), decreasing = TRUE), ], 10),
 
 ```{r permutation}
 ## get all numeric 
-ai_com <- as.matrix(apodata)
+ai_com <- as.matrix(data.frame(apodata, indi_t$tstatistic))
+dim(ai_com)
 N <- choose(16, 8)
 ## get the complement vector
 '%nin%' <- Negate('%in%')
-## put the long vector at the first place 
-ai_com[1,][ai_com[1,] %nin% gene1_com[1,] ]
 
 ## get the combinations for gene1
-gene1_com <- combinations(16, 8, ai_com[1,], set = FALSE)
+gene1_com <- combinations(16, 8, ai_com[1,1:16], set = FALSE)
 dim(gene1_com)
 
-## get t
+## put the long vector at the first place to make the complement vector
+ai_com[1,1:16][ai_com[1,1:16] %nin% gene1_com[1,] ]
+
+## get the matrix of the other group
 gene1_paired_t <- apply(gene1_com, 1, function(gene1_com){
-   ai_com[1,][ai_com[1,] %nin% gene1_com]
+   ai_com[1,1:16][ai_com[1,1:16] %nin% gene1_com]
 })
 
 gene1_paired <- t(gene1_paired_t)
 
 ## test of the combination and its complement
-ai_com[1, ] %in% c(gene1_com[2, ], gene1_paired[2, ])
+ai_com[1, 1:16] %in% c(gene1_com[2, ], gene1_paired[2, ])
 
 ## the individual t statistic
-indi_t$tstatistic[1]
+ai_com[1, 17]
 
 # The permutaion t statistic
 gene1 <- cbind(gene1_com, gene1_paired)
 
 gene1_t <- sapply(1:6384, function(row){
-  test = t.test(gene1[row, 1:8], ai[row, 9:16], alternative = "two.sided")
+  test = t.test(gene1[row, 1:8], gene1[row, 9:16], alternative = "two.sided")
   test$statistic
 })
 ## compare the t statistic and get the p-value
-p_gene1 <- sum(abs(gene1_t) > abs(indi_t$tstatistic[1]))/N
+p_gene1 <- sum(abs(gene1_t) > abs(ai_com[1, 17]))/N
 p_gene1
 
 ## the p-value of individual t.test
 indi_t$pvalue[1]
 
 ## summarise above procedures for gene1 as a function
+#############################################
+## this function only works for genes_matrix 8 columns control, 
+## 8 columns treatment and the last column is individual t statistics
+## 6384 genes in total 
+#########################################
 combi_p <- function(gene){
+  # first 8 columns of combinations
+  gene_com = combinations(16, 8, gene[1:16], set = FALSE)
   
+  # the 2nd 8 columns of combinations
+  gene_paired_t = apply(gene_com, 1, function(gene_com){
+   gene[1:16][gene[1:16] %nin% gene_com]
+})
+  gene_paired = t(gene_paired_t)
+  
+  # combine to make the permutation matrix
+  gene_matrix = cbind(gene_com, gene_paired)
+  
+  # permutation t statistic vector
+  gene_t = sapply(1:6384, function(row){
+  test = t.test(gene_matrix[row, 1:8], gene_matrix[row, 9:16], alternative = "two.sided")
+  test$statistic
+})
+  
+  # individual t-statistic 
+  t = gene[17] 
+  
+  ## calculate the p-value
+  p_gene = sum(abs(gene_t) > abs(t))/N
+  return(p_gene)
 }
 
+## test run 
+apply(head(ai_com),1, combi_p)
 
+```
+
+```{r fullpermutation, eval = FALSE}
+## using the function 
 
 ```
 
