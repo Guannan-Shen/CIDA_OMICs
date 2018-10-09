@@ -52,7 +52,8 @@ colnames(p_per) <- c("genenames", "pvalue")
 ## get the p value 0.01
 p_per_1 <- p_per %>% filter(pvalue <= 0.01)
 write.csv(p_per_1, "permutationP.csv")
-
+getwd()
+dim(p_per_1)
 
 
 
