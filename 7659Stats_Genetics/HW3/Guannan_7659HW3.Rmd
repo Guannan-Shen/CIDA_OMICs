@@ -28,9 +28,9 @@ knitr::opts_chunk$set(echo = T)
 knitr::opts_chunk$set(message = F)
 knitr::opts_chunk$set(warning = F)
 ## setting working directory in asus 
-## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
+opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
 ## setting working directory in ubuntu
-opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
+## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -66,7 +66,6 @@ colnames(aponame) <- "genenames"
 # combine the names and intensity
 ai <- cbind(aponame, apodata)
 
-
 ## the raw data is log2 transformed 
 ## the fold change is calculated from the subtraction
 ailogratio <- (base::rowSums(ai[,10:17]) - base::rowSums(ai[,2:9]))/8
@@ -98,6 +97,8 @@ indi <- lapply(1:6384, function(row){
 })
 
 indi_t <- data.frame(matrix(unlist(indi), ncol = 3, byrow = TRUE))
+indi_t[1:5,]
+
 colnames(indi_t) <- c("genenames", "pvalue", "tstatistic")
 indi_t <- indi_t %>%mutate(pvalue = as.numeric(pvalue), 
                            tstatistic = as.numeric(tstatistic))  
@@ -153,6 +154,8 @@ gene1_paired_t <- apply(gene1_com, 1, function(gene1_com){
    ai_com[1,1:16][ai_com[1,1:16] %nin% gene1_com]
 })
 
+dim(gene1_paired_t)
+
 gene1_paired <- t(gene1_paired_t)
 
 ## test of the combination and its complement
@@ -163,6 +166,8 @@ ai_com[1, 17]
 
 # The permutaion t statistic
 gene1 <- cbind(gene1_com, gene1_paired)
+
+head(gene1)
 
 gene1_t <- sapply(1:6384, function(row){
   test = t.test(gene1[row, 1:8], gene1[row, 9:16], alternative = "two.sided")
@@ -204,7 +209,7 @@ combi_p <- function(gene){
   t = gene[17] 
   
   ## calculate the p-value
-  p_gene = sum(abs(gene_t) > abs(t))/N
+  p_gene = sum(abs(gene_t) >= abs(t))/N
   return(p_gene)
 }
 
@@ -213,6 +218,8 @@ matrix(apply(head(ai_com),1, combi_p), ncol = 1, byrow = TRUE)
 system.time(matrix(apply(head(ai_com),1, combi_p), ncol = 1, byrow = TRUE))
 ## compare with individual p-value
 indi_t$pvalue[1:6]
+head(indi_t)
+
 
 ```
 
