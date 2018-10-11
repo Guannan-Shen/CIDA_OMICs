@@ -32,7 +32,7 @@ combi_p <- function(gene){
   t = gene[17] 
   
   ## calculate the p-value
-  p_gene = sum(abs(gene_t) > abs(t))/N
+  p_gene = sum(abs(gene_t) >= abs(t))/N
   return(p_gene)
 }
 
@@ -54,7 +54,7 @@ p_per_1 <- p_per %>% filter(pvalue <= 0.01)
 write.csv(p_per_1, "permutationP.csv")
 getwd()
 dim(p_per_1)
-
+View(p_per_1)
 
 
 

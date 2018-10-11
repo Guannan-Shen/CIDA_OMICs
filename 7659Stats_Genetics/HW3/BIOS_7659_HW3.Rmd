@@ -1,0 +1,286 @@
+---
+title: "BIOS 7659 Homework 3"
+author: "Charlie Carpenter"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("qvalue")
+#biocLite("impute")
+#biocLite("limma")
+
+## Dependencies
+library(tidyverse); library(magrittr); library(limma); library(qvalue); library(impute); library(knitr)
+
+## sourcing samr function stored locally
+lapply(## Files to source from samr package
+  list("SAM.R", "samr.morefuns.R", "samr.R", "samr.xlfuncs.R", "SAMseq.R"),
+  function(x){
+    ## working directory
+    ff <- paste("~/Documents/Classes_Fall_2018/BIOS 7659/HW1/Codes/samr/R/",
+                x ,sep = "") 
+    source(ff)
+  })
+```
+
+##1
+
+####a)
+
+```{r, echo = F}
+## reading in data and gene names
+Data <- read.table("~/Documents/Classes_Fall_2018/BIOS 7659/HW3/hw3data/hw3arraydata.txt")
+dat_names <- read.table("~/Documents/Classes_Fall_2018/BIOS 7659/HW3/hw3data/hw3genenames.txt", blank.lines.skip = FALSE)
+```
+
+```{r}
+## Difference in log means (log ratios)
+log_ratios <- apply(Data, 1, function(x){
+  mean(x[1:8]) - mean(x[9:16]) ## The function rowMeans would also work
+})
+
+## Log ratio -> fold changes
+fold_change <- data.frame(Fold.Change = gtools::logratio2foldchange(log_ratios) %>% round(3),
+                          Gene = dat_names$V1) %>% 
+  .[order(abs(.$Fold.Change), decreasing = T),]
+
+## Top 10 fold changes
+fold_change[1:10,] %>% kable
+```
+
+####b)
+
+```{r}
+## Running a Welch's two sided t.test for each gene
+tests <- apply(Data, 1, function(g){
+  ttt <- t.test(x = g[1:8], y = g[9:16],
+         alternative = "two.sided")
+  
+  ## returning t-stat and p-value
+  return(data.frame(t = ttt$statistic %>% round(3), `p-value` = ttt$p.value))
+}) %>% 
+  do.call(rbind, .) %>% ## Row binding them so they aren't in a list
+  mutate(Gene = dat_names$V1) %>% ## Attaching Gene names
+  .[order(abs(.$t), decreasing = T),] ## Ordering by magnitude of t stat
+
+tests[1:10,] %>% kable
+```
+
+\quad There were `r sum(tests$p < 0.01)` genes that were significant at the 0.01 level based on Welch's t-test. 
+
+####c)
+
+i) 
+
+```{r, results='hide'}
+## SAM t-test for differential expression
+sam.test <- SAM(x = as.matrix(Data), y = rep(c(1,2), each = 8), genenames = dat_names$V1,
+    resp.type = "Two class unpaired", logged2 = T)
+```
+
+```{r}
+## Obtaining the test statistic from SAM and calculating the p-value from it
+## Not adjust degrees of freedom since our t-stat is already "modified"
+
+sam.frame <- data.frame(t = sam.test$samr.obj$tt %>% round(3),
+                        p.value = pt(-abs(sam.test$samr.obj$tt), df = 14)*2,
+                        Gene = dat_names$V1
+                        ) %>% 
+  .[order(abs(.$t), decreasing = T), ]
+
+sam.frame[1:10,] %>% kable
+```
+
+\quad There were `r sum(sam.frame$p.value < 0.01)` genes significant at the 0.01 level based on the SAM "modified" t-statistic.
+
+ii)
+
+```{r}
+des <- cbind(Cont = 1, KvC = rep(c(0,1), each = 8)) ## The design matrix
+
+## Estimate the fold changes and standard errors by fitting a linear model for each gene.
+lim.fit <- lmFit(as.matrix(Data), design = des) %>% 
+  eBayes ## Apply empirical Bayes smoothing to the standard errors
+
+## Show statistics ordered by magnitude of t-statistics with FDR (BH) adjusted p.values
+lim.dat <- topTable(lim.fit, coef = "KvC", genelist = dat_names, adjust.method = "BH", number = nrow(Data))
+
+## Top 10 rows/genes
+lim.dat[1:10,] %>% kable
+```
+
+\quad There were `r sum(lim.dat$adj.P.Val < 0.01)` genes significant at the 0.01 level after an FDR p-value adjustment.
+
+####d)
+
+\quad In a) we are simply ranking the genes by their fold changes between wild type and knock outs. Although this is not a formal test by any means, the results from the following methods should echo what we see in the raw fold changes.
+
+\quad In b) we are using basic t-tests on the average fold change between wild type and knock out genes. The default in R for t.test is to estimate the variance separately for each group and use the Welch modification for the degrees of freedom.
+
+\quad In c) we are calculating the *samr* "modified" t-statistic. For this t-statistic we add a constant onto the pooled variance to increase overall standard error and shrink the t-statistics. Here $$ t_{samr} = \frac{\bar{y_1} - \bar{y_2}}{s_p + s_0} $$ where $s_p$ is the pooled variance and $s_0$ is the $\alpha^{th}$ percentile of standard error of all genes (5% most commonly).
+
+\quad In d) we are using *limma* to calculated "moderated" t-statistics. It uses an empirical Bayes method to squeeze the genewise residual variance towards a common value. the reslting t-statistic is then $$t_{limma} = \frac{\bar{y_1} - \bar{y_2}}{\tilde{s}_g \sqrt{1/n_1 + 1/n_2}},$$ where $\tilde{s}_g$ is the empirical Bayes estimate.
+
+##2
+
+####a)
+
+```{r, eval = F}
+## Function to calculate permutation distribution for each gene
+permutation <- function(dat, n., r.){
+  ## apply to each row (gene)
+  tp.dat <- apply(dat, 1, function(dat., nn, rr){
+    
+    ## All combinations for each gene
+    com <- gtools::combinations(nn, rr, dat.) 
+    
+    ## Applying t-test to each combination
+     ts <-  apply(com, 1, function(com., dd){
+        x1 <- com. ## Combination
+        
+        x2 <- dd[!(dd %in% com.)] ## all samples not in the combination
+      
+        ## t-statistic from Welch t.test
+        t.test(x1, x2, alternative = "two.sided")$statistic 
+        
+        }, dd = dat.)
+     
+     ## Tacking original t-stat onto the others
+     ts <- c(t.test(dat.[1:8],dat.[9:16], alternative = "two.sided")$statistic,
+             ts)
+     
+     ## returning first (original) t-stat and the permutation based p-value
+     return(
+       data.frame(T.stat = ts[1],
+                 p.value = sum(abs(ts) >= abs(ts[1]))/(length(ts) - 1)
+                  ## (length - 1) since we tacked on extra original value
+                 ) 
+       )
+  }, nn = n., rr = r.)
+  
+  ## rowbinding the t-stat / p-values so they are a data.frame
+  tp.dat %>% 
+    do.call(rbind, .) 
+}
+
+## running permutation tests and adding on the gene names
+perm.t <- permutation(Data,16,8) %>% mutate(Gene = dat_names$V1)
+```
+
+```{r, echo = F}
+perm.t <- read.csv("~/Documents/Classes_Fall_2018/BIOS 7659/HW3/hw3data/Permutation_test.csv")
+```
+
+```{r}
+perm.t %<>% .[order(.$p.value),] %>% mutate(T.stat = round(T.stat, 3))
+
+perm.t[1:10,] %>% kable
+```
+
+\quad There were `r sum(perm.t$p.value < 0.01)` genes significant at the 0.01 from the t-statistic permutation tests.
+
+####b)
+
+i)
+
+\quad A Bonferroni correction simply multiplies each p-value by the numer of tests conducted. It is a very conservative correction to multiple test corrections.
+
+```{r}
+my_bonferroni <- function(p) ifelse(length(p)*p < 1, length(p)*p, 1)
+
+tests[which(my_bonferroni(tests$p.value) < 0.01),] %>%
+  mutate(t = round(t,3)) %>% 
+  kable
+```
+
+\quad There are `r sum(my_bonferroni(tests$p.value) < 0.01)` genes significant at the 0.01 level after a Bonferroni correction.
+
+ii)
+
+\quad The Sidak correction is based on the family-wise error rate: $1 - (1-p)^m$. It calcualates $\tilde{p}_j = 1 - (1-p_j)^m$ and we would reject for $\tilde{p}_j < \alpha$. This approach is less conservative than the Bonferroni adjustment. 
+
+\quad Both i) and ii) are single-step procedures that are performed on all p-values regardless of how they relate to other p-value (other than number of p-values calculated).
+
+```{r}
+my_sidak <- function(p) 1 - (1-p)^length(p)
+
+tests[which(my_sidak(tests$p.value) < 0.01),] %>% 
+  mutate(t = round(t,3)) %>% 
+  kable
+```
+
+\quad There are `r sum(my_sidak(tests$p.value) < 0.01)` genes significant at the 0.01 level after a Sidak correction.
+
+iii)
+
+\quad The Holm step-down proceedure ranks all $m$ p-values where $p_{(1)} \leq p_{(2)} \leq ... \leq p_{(m)}$ and will reject for $p_{(j)} < \alpha /(m - j + 1)$. This (and other stepwise procedures) are less conservative than the single-step proceedures discussed above since the larger p-values are subject to less stringent bounds.
+
+```{r}
+my_homlsd <- function(p, a){
+  
+  ## ranked p-values
+  ps <- data.frame(j = 1:length(p), ## dummy variable for rank
+                   p.o = p 
+                   )[order(p), ]
+  
+  # Ranked rejection criteria
+  ps$Holm_Reject <- ifelse( ps$p.o < (a / (nrow(ps) - ps$j + 1)), "R", "FTR" )
+  
+  # Putting back to original order
+  ps <- ps[order(ps$j),] 
+  
+  return(ps)
+} 
+
+tests[which((my_homlsd(tests$p.value, .01)$Holm_Reject) == "R"),] %>%
+  mutate(t = round(t)) %>% 
+  kable
+```
+
+\quad There are `r sum(my_homlsd(tests$p.value, .01)$Holm_Reject == "R")` genes significant at the 0.01 level after a Holm step-down correction.
+
+iv)
+
+\quad The BH step-up procedure controls for the false discovery rate ($q$) set by analyst. The procedure ranks all $m$ p-values where $p_{(1)} \leq p_{(2)} \leq ... \leq p_{(m)}$ and will reject for $p_{(j)} \leq \frac{j}{m}q$. 
+
+\quad Both iii) and iv) are step wise proceedures and both consider each p-value in relation to the other p-values calculated. This is the purpose of ranking. Procedures i) - iii) control for the family wise error rate and are ordered from the most to least conservative. The BH step-up procedure is different in that it aims to control for the false discover rate instead of the family wise error rate. 
+
+```{r}
+my_FDR <- function(p, q){
+  
+  ## ranked p-values
+  ps <- data.frame(j = 1:length(p), ## dummy variable for rank
+                   p.o = p 
+                   )[order(p, decreasing = T), ]
+  
+  ps$FDR_Reject <- ifelse( ps$p.o < (ps$j / nrow(ps)) * q , "R", "FTR" )
+  
+  # Putting back to original order
+  ps <- ps[order(ps$j),] 
+  
+  return(ps)
+}
+
+tests[which(my_FDR(tests$p.value, .01)$FDR_Reject == "R"), ] %>%
+  mutate(t = round(t)) %>% 
+  kable
+```
+
+\quad There are `r sum(my_FDR(tests$p.value, .01)$FDR_Reject == "R")` genes significant at the 0.01 level after a Holm step-down correction.
+
+####c)
+
+```{r}
+q.vals <- qvalue(tests$p.value)
+```
+
+\quad There were `r sum(q.vals$qvalues < 0.01)` q-values lower than 0.01.
+
+\quad The q-value of a test measures the proportion of false discoveries for when that particular test is called significant. $\pi_0$ is the proportion of true null hypotheses, and it estimated internally. For this set of genes it is estimated to be `r q.vals$pi0 %>% round(3)`.
+
+
+
+
+
+

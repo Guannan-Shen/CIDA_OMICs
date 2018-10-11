@@ -3,14 +3,14 @@ title: "7659 HW3"
 author: "Guannan Shen"
 date: "October 4, 2018"
 output: 
-  word_document:
-    toc: yes
-    toc_depth: '5'
   pdf_document:
     latex_engine: lualatex
     number_sections: yes
     toc: yes
     toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
   html_document:
     number_sections: yes
     theme: united
@@ -28,9 +28,9 @@ knitr::opts_chunk$set(echo = T)
 knitr::opts_chunk$set(message = F)
 knitr::opts_chunk$set(warning = F)
 ## setting working directory in asus 
-opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
 ## setting working directory in ubuntu
-## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW3/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -85,10 +85,12 @@ kable(head(aifc[order(abs(aifc$aifc), decreasing = TRUE), ], 10),
 ```
 
 ## 2. Obtain the p-values from a two sided t-test for differential expression. How many genes are significant at the 0.01 level? List the top 10 genes that have the largest t-statistics and their corresponding p-value. 
-There are 75 genes are significant at the 0.01 level, by gene-level individual t-test.  
+There are 75 genes are significant at the 0.01 level, by gene-specific t-test (two-sided Welch's t-test).  
 
 ```{r ttest2}
 # carry out individual t-tests
+
+## welch t-test
 
 indi <- lapply(1:6384, function(row){
   test = t.test(ai[row, 2:9], ai[row, 10:17], alternative = "two.sided")
@@ -108,31 +110,85 @@ dim(indi_p)
 indi_p
 
 kable(head(indi_p[order(abs(indi_p$tstatistic), decreasing = TRUE), ], 10), 
-              caption = "Top10 Genes by gene-level t-test")
+              caption = "Top10 Genes by gene-specific t-test")
 
                             
 
 ```
 
 
-## c. Calculate the **modified** t-statistic and corresponding p-value using the samr package in R used in Homework2. How many genes are significant at the 0.01 level? List the top 10 genes that have the largest **penalized** t-statistics.
+## c1. Calculate the **modified** t-statistic and corresponding p-value using the samr package in R used in Homework2. How many genes are significant at the 0.01 level? List the top 10 genes that have the largest **penalized** t-statistics.
+29 genes were significant at the 0.01 level by the samr modified t-test.  
 
 ```{r samr}
+## prepare sam data 
+sam.test <- SAM(x = as.matrix(apodata), y = rep(c(1,2), each = 8), genenames = ai$genenames,
+    resp.type = "Two class unpaired", logged2 = T)
 
+## get t statistic and p-value from sam.test
+sam.t <- sam.test$samr.obj$tt
+## calculate the 2-sided t statistic
+sam.p <- pt(-abs(sam.t), 14)*2
+sam.result <- data.frame(genenames = ai$genenames, p.value = sam.p, t.statistic = sam.t) %>% 
+  .[order(abs(.$t.statistic), decreasing = TRUE),]
+
+kable( head(sam.result, 10), caption = "Top10 Genes by samr t-test" )
+
+## p 0.01 cutoff
+n_sam <- nrow(filter(sam.result, p.value <= 0.01)) 
+n_sam
 
 ```
 
 
-## d. 
-
+## c2. Calculate the ‘moderated’ t-statistic and corresponding p-value using the limma package from BioConductor
+8 genes are significant at the 0.01 level. 
 ```{r limma}
+## study design, design matrix
+lim_sample <- as.factor(rep(c("C", "K"), each = 8))
+design <- model.matrix(~ 0 + lim_sample)
+colnames(design) <- levels(lim_sample)
 
+## contrast matrix
+lim_contrast <- makeContrasts(diff = K - C, levels = design)
+
+## Estimate the fold changes and standard errors by fitting a linear model for each gene
+lim_fit <- lmFit(as.matrix(apodata), design = design) 
+lim_fit2 <- contrasts.fit(lim_fit, lim_contrast)
+lim_fit3 <- eBayes(lim_fit2)
+
+## get the test statistic for column of interest
+lim_result <- topTable(lim_fit3, coef = "diff", genelist = ai$genenames, adjust.method = "BH", number = nrow(ai))
+
+## 
+kable(head(lim_result,10), caption = "Top10 genes by limma moderated t")
+
+## 
+n_limma <- sum(lim_result$adj.P.Val <= 0.01)
+n_limma
 
 
 ```
+
+
+## Compare and contrast the results for the four methods for ranking genes. Explain the differences in how the different t-statistics are calculated.
+
+### Fold Change Approach 
+No statistical test was done by this method. This is just a descriptive way to present the difference in gene expression levels between two groups. However, the rank of genes derived by fold change method should be similar with following methods.
+
+### gene-specific t-test
+This is a two-sided Welch's t-test on individual gene level. Within each gene, the variances were evaluated separately for each group, and the degree of freedom was calculated by  Welch–Satterthwaite equation. There is no information (variance) shared across genes and no adjustment for multiple comparison. Hence, this method is not appropriate.
+
+### samr modified t-statistic
+In this method, the pooled standard error for each gene $SE_g$ is increased by a positive constant $c$, the 5% percentile of s.e. of all genes. Let $R_g$ be the mean log ratio of one gene, the statistic now is 
+s = Rg / (c + SEg). In this way, the standard error is increased and the t-statistic is shrinked. 
+
+### limma method
+In limma moderated t-statistic, the empirical Bayes method is used to estimte the within gene variance. And the s.e. in this method is the variance over the square root of $(1/n_1 + 1/n_2)$. This method is more conservative.
 
 # P-values and Multiple Testing 
-##
+## Calculate p-values for the t-statistics using permutations (B=12870 possibilities).
+First, test the permuation with the gene1, then make the function and test with first 5 genes, finally use all gene to run the whole permutation test. In the *gtools::combinations()*. I assigned the *set = FALSE*, which means do not remove the duplicates from the 16 values for each gene. 213 genes are significant at the 0.01 level. 
 
 ```{r permutation}
 ## get all numeric 
@@ -236,35 +292,84 @@ p_per_1 <- p_per %>% filter(pvalue <= 0.01)
 write.csv(p_per_1, "permutationP.csv")
 ```
 
-##
+## multiple testing adjustment methods to gene-specific t-test
+
+### Bonferroni 
+This method is family-wise error rate (FWER) correction method, and the adjusted-p is calculated by multiplication of each p-value by the numer of tests conducted. It is very conservative. 
+
+### Sidak
+This method also belongs to FWER corrections, and the adjusted-p is $(1 - (1- p_{t-test})^n)$. This method is slightly less conservative compared with the Bonferroni method. 
+
+### Holm step-down procedure
+This procedure also controls for FWER but takes the rank of of p-values into account. For all $m$ p-values where $p_{(1)} \leq p_{(2)} \leq ... \leq p_{(m)}$, p-values from the smallest to $p_{(j)} < \alpha /(m - j + 1)$ will be rejected. This method is less conservative compared with the above two since larger p values are dealt with less stringent conditions. 
+
+### Benjamini-Hochberg procedure
+The BH step-up procedure is False Discovery Rate (FDR) correction method and also ranks all $m$ p-values where $p_{(1)} \leq p_{(2)} \leq ... \leq p_{(m)}$.  The null hypothesis will be rejected for $p_{(j)} \leq \frac{j}{m}q$. 
+
+### Number
+For Bonferroni, Sidak and Holm, 3 genes are significant at 0.01. For BH, 8 genes are significant at 0.01. 
+
 ```{r adjust}
 # the original t-test 1b
 n = nrow(ai)
 head(indi_t, 3)
 
 ## the Bonferroni is n*p
+## psidak_FWER = (1 - (1- pvalue)^n)
+## function for holm and BH
+holm <- function(p){
+  lp = length(p)
+   i = seq_len(lp)
+   o = order(p) 
+   p = p[o]  ## now p is increasing
+   ro = order(o)  # the rank(p)
+   q <- pa <- rep.int(min(lp * p/i), lp)
+    for (j in (lp - 1):2) {
+      ij = seq_len(lp - j + 1)
+      i2 = (lp - j + 2):lp
+      q1 = min(j * p[i2]/(2:j))
+      q[ij] = pmin(j * p[ij], q1)
+      q[i2] = q[lp - j + 1]
+      pa <- pmax(pa, q)
+    }
+    pmax(pa, p)[ro]
+}
+
+BH <- function(p){
+  lp = length(p)
+  i = lp:1
+    o = order(p, decreasing = TRUE)
+    ro = order(o)   # rank of p, increasing 
+    pmin(1, cummin(lp/i * p[o]))[ro]
+}
+
 indi_adjust <- indi_t %>% mutate(pBonferroni_FWER = pmin(1, n*pvalue),
                                  psidak_FWER = (1 - (1- pvalue)^n),
-                                 pholm_FWER = ,
-                                 pBH_FDR = ,
-                                 pBY_FDR)
-
-## check adjusted p-value 
-head(indi_adjust, 3)
-indi_adjust[540, ]
-
-p <- c(0.01, 0.001, 0.002, 0.05)
-o <- order(p)
-ro <- order(o)
-p
-o
-ro
-
-
+                                 pholm_FWER = holm(pvalue),
+                                 pBH_FDR = BH(pvalue))
+                   
+## results
+sum(indi_adjust$pBonferroni_FWER <= 0.01)
+sum(indi_adjust$psidak_FWER <= 0.01)
+sum(indi_adjust$pholm_FWER <= 0.01)
+sum(indi_adjust$pBH_FDR <= 0.01)
 ```
 
 
 
 
+```{r qvalue}
+head(indi_t)
+q_value <- qvalue(indi_t$pvalue)
+## cutoff
+sum(q_value$qvalues < 0.01)
+
+## 
+q_value$pi0
+```
+
+## Calculate q-values using the qvalue library.
+8 genes have a q-value less than 0.01.  
+$\pi_0$ is the proportion of true null hypotheses, which is estimated by the whole gene expression dataset. In this case, it is `r q_value$pi0`.
 
 
