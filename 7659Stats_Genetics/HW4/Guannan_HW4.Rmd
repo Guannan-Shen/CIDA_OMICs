@@ -1,0 +1,74 @@
+---
+title: "7659_HW4"
+author: "Guannan Shen"
+date: "October 15, 2018"
+output: 
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+## setting working directory in asus 
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW4/")
+## setting working directory in ubuntu
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW4/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+```{r libs}
+## set up workspace
+library(knitr)
+library(tidyverse)
+options(stringsAsFactors = F)
+options(dplyr.width = Inf)
+getwd()
+```
+
+```{r plots, fig.width = 10}
+gal_sum <- read.table("Galaxy3_FASTQ_Summary_Statistics_on_data_2.tabular")
+ggplot(gal_sum, aes(x = V1) ) +
+  geom_line(aes(y = V14, color = "A_Count")) +
+  geom_point(aes(y = V14, color = "A_Count")) + 
+  geom_line(aes(y = V15, color = "C_Count")) +
+  geom_point(aes(y = V15, color = "C_Count")) +
+  geom_line(aes(y = V16, color = "G_Count")) +
+  geom_point(aes(y = V16, color = "G_Count")) +
+  geom_line(aes(y = V17, color = "T_Count")) +
+  geom_point(aes(y = V17, color = "T_Count")) +
+  geom_line(aes(y = V18, color = "N_Count")) +
+  geom_point(aes(y = V18, color = "N_Count")) +
+  scale_x_discrete(name ="Read Positions", 
+                    limits=c(1:36)) +
+  scale_y_continuous(name = "Nucleotide Content") +
+  theme_bw() +
+  scale_colour_manual("", 
+                      breaks = c("A_Count", "C_Count", "G_Count","T_Count","N_Count"),
+                      values = c("A_Count" = "red", 
+                                 "C_Count" = "black", 
+                                 "G_Count" = "grey",
+                                 "T_Count" = "yellow", 
+                                 "N_Count" = "brown"))
+  
+
+```
