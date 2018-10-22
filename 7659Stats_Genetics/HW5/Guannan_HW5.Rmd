@@ -1,0 +1,87 @@
+---
+title: "7659 HW5"
+author: "Guannan Shen"
+date: "October 22, 2018"
+output: 
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+## setting wd in DELL
+opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
+## setting working directory in asus 
+## opts_knit$set(root.dir =      "C:/Users/hithr/Documents/Stats/6624AdvStatsAnalysis/bios6624-Guannan-Shen/Project2/Code") 
+## setting working directory in ubuntu
+## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+
+```{r libs}
+## set up workspace
+library(knitr)
+library(tidyverse)
+library(RNASeqPower)
+library(edgeR)
+library(cqn)
+## library(EDASeq)
+library(yeastRNASeq)
+options(stringsAsFactors = F)
+options(dplyr.width = Inf)
+getwd()
+## not in function
+`%nin%` = Negate(`%in%`)
+
+```
+
+# HW5  
+
+## 1. Next Generation Sequencing: Sample Size Estimates
+
+### (a) Using rnapower(), recreate Figure 3 from the journal club paper, Hart
+
+```{r SampleSize}
+## montgomery data from cqn
+data(montgomery.subset)
+## GC and gene length of montgomery
+data(uCovar)
+## vector of length 10 containing the number of mapped reads for each sample
+data(sizeFactors.subset)
+
+########## Understand the dataset ########
+## help(montgomery)
+## number of genes 
+## genes that have zero counts in all 10 samples were already excluded
+ng_mont <- nrow(montgomery.subset)
+
+############## Question 1 figure 3 ################
+## sample size (ss) vs depth 
+rnapower()
+
+
+
+
+
+```
+
