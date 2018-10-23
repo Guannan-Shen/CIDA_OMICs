@@ -28,9 +28,9 @@ knitr::opts_chunk$set(warning = F)
 ## setting wd in DELL
 ## opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
 ## setting working directory in asus 
-## opts_knit$set(root.dir =      "C:/Users/hithr/Documents/Stats/6624AdvStatsAnalysis/bios6624-Guannan-Shen/Project2/Code") 
+opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/") 
 ## setting working directory in ubuntu
-opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/")
+## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -157,13 +157,16 @@ dge <- estimateTagwiseDisp(dge)
 
 ## the distribution of tagwise dispersion (genewise variation)
 par(mfrow = c(1,2))
-hist(dge$tagwise.dispersion, breaks = 60)
-plot(ecdf(dge$tagwise.dispersion), ylab="Fn(x)")
+## bcv is estimated as the sqrt of dispersion
+bcv <- sqrt(dge$tagwise.dispersion)
+## plots 
+hist(bcv, breaks = 60)
+plot(ecdf(bcv), ylab="Fn(x)")
 
 ## median and 90% quantile 
-med_mont <- median(dge$tagwise.dispersion)
+med_mont <- median(bcv)
 med_mont
-quan09_mont <- as.numeric(quantile(dge$tagwise.dispersion, probs = 0.9))
+quan09_mont <- as.numeric(quantile(bcv, probs = 0.9))
 quan09_mont
 
 ```
@@ -192,7 +195,7 @@ ggplot(ssize_depth_mont, aes(x = 1:50) ) +
   scale_x_discrete(name ="Depth of Gene", 
                     limits=c(1:50)) +
   scale_y_continuous(name = "Sample Size Needed per Group ",
-                     breaks = c(50, 100, 150, 200, 250, 300)) +
+                     breaks = c(0, 25, 50, 100, 125, 150)) +
   theme_bw() +
   scale_colour_manual("", 
                       breaks = c("Median CV", "90% Quantile CV"),
@@ -209,7 +212,7 @@ ggplot(ssize_depth_mont, aes(x = 1:50) ) +
 ```{r power_curve}
 ## power curve for n = 20 per group, coverage of 100, 
 ## s = 0.32 (60th percentile of observed) and a = 0.001.
-s06 <- as.numeric(quantile(dge$tagwise.dispersion, probs = 0.6))
+s06 <- as.numeric(quantile(bcv, probs = 0.6))
 p_curve <- sapply(seq(1,8, by=0.1), function(x){
   rnapower(depth = 100, cv = s06, n = 20,
            effect = x, alpha = 0.001)
