@@ -1,0 +1,343 @@
+---
+title: "7659 HW5"
+author: "Guannan Shen"
+date: "October 22, 2018"
+output: 
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+## setting wd in DELL
+## opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
+## setting working directory in asus 
+## opts_knit$set(root.dir =      "C:/Users/hithr/Documents/Stats/6624AdvStatsAnalysis/bios6624-Guannan-Shen/Project2/Code") 
+## setting working directory in ubuntu
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+
+```{r libs}
+## set up workspace
+library(knitr)
+library(tidyverse)
+library(RNASeqPower)
+library(edgeR)
+library(cqn)
+library(EDASeq)
+library(yeastRNASeq)
+options(stringsAsFactors = F)
+options(dplyr.width = Inf)
+getwd()
+## not in function
+'%nin%' <- Negate('%in%')
+
+```
+
+# HW5  
+
+## 1. Next Generation Sequencing: Sample Size Estimates
+
+### (a) Using rnapower(), recreate Figure 3 from the journal club paper, Hart. 
+
+```{r SampleSize, fig.width= 9, fig.height= 6}
+## montgomery data from cqn
+data(montgomery.subset)
+## GC and gene length of montgomery
+data(uCovar)
+## vector of length 10 containing the number of mapped reads for each sample
+data(sizeFactors.subset)
+
+########## Understand the dataset ########
+## help(montgomery)
+## number of genes 
+## genes that have zero counts in all 10 samples were already excluded
+ng_mont <- nrow(montgomery.subset)
+
+############## Question 1 figure 3 ################
+## sample size (ss) vs depth 
+## sample size per group 
+ssize_depth <-  sapply(c(0.4, 0.8, 1.2), function(y){
+  sapply(1:50, function(x){
+  rnapower(depth = x, cv = y, 
+           effect = 2, alpha = 0.05, power = 0.8)
+ })
+})
+ssize_depth <- data.frame(ssize_depth)
+colnames(ssize_depth) <- c("V1", "V2", "V3")
+
+### Plot 
+ggplot(ssize_depth, aes(x = 1:50) ) +
+  geom_line(aes(y = V1, color = "CV = 0.4")) +
+  geom_point(aes(y = V1, color = "CV = 0.4")) + 
+  geom_line(aes(y = V2, color = "CV = 0.8")) +
+  geom_point(aes(y = V2, color = "CV = 0.8")) +
+  geom_line(aes(y = V3, color = "CV = 1.2")) +
+  geom_point(aes(y = V3, color = "CV = 1.2")) +
+  
+  scale_x_discrete(name ="Depth of Gene", 
+                    limits=c(1:50)) +
+  scale_y_continuous(name = "Sample Size Needed per Group ", 
+                     breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80)) +
+  theme_bw() +
+  scale_colour_manual("", 
+                      breaks = c("CV = 0.4", "CV = 0.8", "CV = 1.2"),
+                      values = c("CV = 0.4" = "grey",
+                                 "CV = 0.8" = "yellow", 
+                                 "CV = 1.2" = "brown"))
+
+
+
+
+
+```
+
+### (b) For the Montgomery data, create a row in Table 1 in the Hart et al. paper.
+
+
+```{r Counts}
+########## average of sequence reads aligning to the gene/ depth ############
+## how many reads are assigned to a particular gene / depth ## 
+##  is a data frame with 23552 observations on 10 different samples ## 
+N_total <- sum(sizeFactors.subset)
+## number of genes 
+## genes that have zero counts in all 10 samples were already excluded
+ng_mont 
+
+counts_gene_million <- rowSums(montgomery.subset)/N_total * 1000000
+
+mont_counts <- data.frame(Sample = "Montgomery", 
+                          n = 10, 
+                          Reads = round(N_total/(ng_mont*10),2),
+                          mapped = "100%",
+                          a = round(sum( counts_gene_million < 0.01)/ng_mont,2), 
+                          b = round(sum( 0.01 <= counts_gene_million & counts_gene_million < 0.1)/ng_mont,2),
+                          c = round(sum( 0.1 <= counts_gene_million & counts_gene_million < 1)/ng_mont,2),
+                          d = round(sum( 1 <= counts_gene_million & counts_gene_million < 10)/ng_mont,2),
+                          e = round(sum( 10 <= counts_gene_million & counts_gene_million < 100)/ng_mont,2),
+                          f = round(sum( 100 <= counts_gene_million & counts_gene_million < 1000)/ng_mont,2) ,
+                          g = round(sum( 1000 <= counts_gene_million)/ng_mont,2)  )
+colnames(mont_counts) <- c("Sample", "n", "Avg Reads", "% mapped",
+                           "<0.01", "0.01–0.1", "0.1–1", "1–10", 
+                           "10-100", "100-1000", ">1000")
+kable(mont_counts)  
+
+```
+
+
+### (c) Calculate the biological coefficient of variations (CV) from the Montgomery
+
+```{r CV, fig.width= 9, fig.height= 6}
+## edgeR  DGElist 
+dge <- DGEList(counts = montgomery.subset, lib.size = sizeFactors.subset,
+               group= rep(1, length(sizeFactors.subset)))
+dge <- estimateCommonDisp(dge)
+dge <- estimateTagwiseDisp(dge)
+
+## the distribution of tagwise dispersion (genewise variation)
+par(mfrow = c(1,2))
+hist(dge$tagwise.dispersion, breaks = 60)
+plot(ecdf(dge$tagwise.dispersion), ylab="Fn(x)")
+
+## median and 90% quantile 
+med_mont <- median(dge$tagwise.dispersion)
+med_mont
+quan09_mont <- as.numeric(quantile(dge$tagwise.dispersion, probs = 0.9))
+quan09_mont
+
+```
+
+The median and 90% percentile of the tagwise dispersions of whole genes in the Montgomery dataset are `r round(med_mont, 4)` and `r round(quan09_mont, 4)`, respectively. 
+
+### (d) Using rnapower(), recreate Figure 3 from Hart et al. again
+```{r med_quan_mont_CV, fig.width= 9, fig.height= 6}
+## sample size (ss) vs depth 
+## sample size per group 
+ssize_depth_mont <-  sapply(c(med_mont, quan09_mont), function(y){
+  sapply(1:50, function(x){
+  rnapower(depth = x, cv = y, 
+           effect = 2, alpha = 0.05, power = 0.8)
+ })
+})
+ssize_depth_mont <- data.frame(ssize_depth_mont)
+colnames(ssize_depth_mont) <- c("V1", "V2")
+
+### Plot 
+ggplot(ssize_depth_mont, aes(x = 1:50) ) +
+  geom_line(aes(y = V1, color = "Median CV")) +
+  geom_point(aes(y = V1, color = "Median CV")) + 
+  geom_line(aes(y = V2, color = "90% Quantile CV")) +
+  geom_point(aes(y = V2, color = "90% Quantile CV")) +
+  scale_x_discrete(name ="Depth of Gene", 
+                    limits=c(1:50)) +
+  scale_y_continuous(name = "Sample Size Needed per Group ",
+                     breaks = c(50, 100, 150, 200, 250, 300)) +
+  theme_bw() +
+  scale_colour_manual("", 
+                      breaks = c("Median CV", "90% Quantile CV"),
+                      values = c("Median CV" = "grey",
+                                 "90% Quantile CV" = "brown"))
+
+
+
+
+```
+
+### (e) Using rnapower(), recreate the curve (not the histogram) in the top Figure 4
+
+```{r power_curve}
+## power curve for n = 20 per group, coverage of 100, 
+## s = 0.32 (60th percentile of observed) and a = 0.001.
+s06 <- as.numeric(quantile(dge$tagwise.dispersion, probs = 0.6))
+p_curve <- sapply(seq(1,8, by=0.1), function(x){
+  rnapower(depth = 100, cv = s06, n = 20,
+           effect = x, alpha = 0.001)
+})
+p_curve <- data.frame(p_curve)
+colnames(p_curve) <- c("V1")
+
+### Plot 
+ggplot(p_curve, aes(x = seq(1,8, by=0.1)) ) +
+  geom_line(aes(y = V1, color = "Power Curve")) +
+  geom_point(aes(y = V1, color = "Power Curve")) +
+  scale_x_discrete(name ="Fold Change", 
+                    limits=c(1:8)) +
+  scale_y_continuous(name = "Power ",
+                     breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1)) +
+  theme_bw() +
+  scale_colour_manual("", 
+                      breaks = c("Power Curve"),
+                      values = c("Power Curve" = "brown"))
+
+```
+
+## 2. Next Generation Sequencing: Pre-Processing
+### (a) Within geneLevelData, how many genes have all zeros as counts? How many have at least one sample with a zero?
+```{r yeast}
+## yeast RNA-seq data set on two mutant and two wildtype strains
+data(geneLevelData)
+## also load the GC content and length 
+data(yeastGC)
+data(yeastLength)
+## GC and gene length of montgomery data(uCovar)
+
+## genes have all zeros as counts
+zero_yeast <- sum(rowSums(geneLevelData) == 0)
+## at least one sample with a zero
+onezero_yeast <- sum(apply(geneLevelData, 1, function(x)
+  {any(x == 0)
+  }))
+## only containing genes with ≥ 10 counts
+geneLevelDataFilter <- geneLevelData[rowSums(geneLevelData) >= 10, ]
+
+##  SeqExpressionSet object for the EDASeq functions.
+exprs = as.matrix(geneLevelDataFilter) # matrix of counts
+sub = intersect(rownames(geneLevelDataFilter), names(yeastGC))
+exprs = exprs[sub,] #only examine genes with annotated GC content/length
+row.names(exprs) = NULL #remove row and column names
+colnames(exprs) = NULL
+
+#Create SeqExpressionSet, which contains counts, labels for the
+#samples and GC content/length
+counts <-  newSeqExpressionSet(counts=exprs,
+          phenoData=data.frame(conditions = factor(colnames(geneLevelDataFilter))),
+          featureData=AnnotatedDataFrame(data.frame(gc=yeastGC[sub],
+          length = yeastLength[sub])))
+
+
+
+```
+
+`r zero_yeast` genes have all zeros as counts. `r onezero_yeast` genes have at least one sample with a zero. 
+
+### (b) For the following plots, use the log scale
+
+```{r plots, fig.width= 9, fig.height= 6}
+par(mfrow = c(1,2))
+## To plot the counts by sample
+boxplot(counts)
+
+## plot the mean by variance plot
+## a smoothScatter plot of the mean variance relation
+## a lowess fit 
+meanVarPlot(counts, log = T)
+
+## To assess any biases by GC content
+biasPlot(counts, "gc", log=TRUE)
+
+## To assess any biases by length
+biasPlot(counts,"length", log=TRUE )
+
+```
+
+
+### (c) Apply withinLaneNormalization() to normalize by GC content.
+
+```{r normalizebyGC_within, fig.width= 9, fig.height= 6}
+par(mfrow = c(1,2))
+## which=c("loess","median","upper","full")
+## normalize by GC content
+## which = "loess"
+norm_loess <- withinLaneNormalization(counts, "gc", which = "loess", offset=FALSE)
+biasPlot(norm_loess, "gc", log=TRUE)
+
+## which = "median"
+norm_median <- withinLaneNormalization(counts, "gc", which = "median", offset=FALSE)
+
+biasPlot(norm_median, "gc", log=TRUE)
+
+## which = "upper"
+norm_upper <- withinLaneNormalization(counts, "gc", which = "upper", offset=FALSE)
+
+biasPlot(norm_upper, "gc", log=TRUE)
+
+
+## which = "full"
+norm_full <- withinLaneNormalization(counts, "gc", which="full", offset=FALSE)
+
+biasPlot(norm_full, "gc", log=TRUE)
+
+
+```
+
+### (d) Using the within-lane normalized data from the previous part
+
+```{r betweenLane, fig.width= 9, fig.height= 6}
+par(mfrow = c(1,2))
+biasPlot(counts, "gc", log=TRUE)
+## "median","upper","full"
+bet_norm_median <-  betweenLaneNormalization(norm_median , which="median", offset=FALSE)
+biasPlot(bet_norm_median, "gc", log=TRUE)
+
+bet_norm_upper <-  betweenLaneNormalization(norm_upper , which="upper", offset=FALSE)
+biasPlot(bet_norm_upper, "gc", log=TRUE)
+
+bet_norm_full <-  betweenLaneNormalization(norm_full , which="full", offset=FALSE)
+biasPlot(bet_norm_full, "gc", log=TRUE)
+```
+
+
+
+
+
