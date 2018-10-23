@@ -225,7 +225,7 @@ gene1 <- cbind(gene1_com, gene1_paired)
 
 head(gene1)
 
-gene1_t <- sapply(1:6384, function(row){
+gene1_t <- sapply(1:N, function(row){
   test = t.test(gene1[row, 1:8], gene1[row, 9:16], alternative = "two.sided")
   test$statistic
 })
@@ -256,7 +256,7 @@ combi_p <- function(gene){
   gene_matrix = cbind(gene_com, gene_paired)
   
   # permutation t statistic vector
-  gene_t = sapply(1:6384, function(row){
+  gene_t = sapply(1:N, function(row){
   test = t.test(gene_matrix[row, 1:8], gene_matrix[row, 9:16], alternative = "two.sided")
   test$statistic
 })
