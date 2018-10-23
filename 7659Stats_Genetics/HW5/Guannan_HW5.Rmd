@@ -3,14 +3,14 @@ title: "7659 HW5"
 author: "Guannan Shen"
 date: "October 22, 2018"
 output: 
+  word_document:
+    toc: yes
+    toc_depth: '5'
   pdf_document:
     latex_engine: lualatex
     number_sections: yes
     toc: yes
     toc_depth: 5
-  word_document:
-    toc: yes
-    toc_depth: '5'
   html_document:
     number_sections: yes
     theme: united
@@ -233,5 +233,111 @@ ggplot(p_curve, aes(x = seq(1,8, by=0.1)) ) +
 ```
 
 ## 2. Next Generation Sequencing: Pre-Processing
+### (a) Within geneLevelData, how many genes have all zeros as counts? How many have at least one sample with a zero?
+```{r yeast}
+## yeast RNA-seq data set on two mutant and two wildtype strains
+data(geneLevelData)
+## also load the GC content and length 
+data(yeastGC)
+data(yeastLength)
+## GC and gene length of montgomery data(uCovar)
+
+## genes have all zeros as counts
+zero_yeast <- sum(rowSums(geneLevelData) == 0)
+## at least one sample with a zero
+onezero_yeast <- sum(apply(geneLevelData, 1, function(x)
+  {any(x == 0)
+  }))
+## only containing genes with ≥ 10 counts
+geneLevelDataFilter <- geneLevelData[rowSums(geneLevelData) >= 10, ]
+
+##  SeqExpressionSet object for the EDASeq functions.
+exprs = as.matrix(geneLevelDataFilter) # matrix of counts
+sub = intersect(rownames(geneLevelDataFilter), names(yeastGC))
+exprs = exprs[sub,] #only examine genes with annotated GC content/length
+row.names(exprs) = NULL #remove row and column names
+colnames(exprs) = NULL
+
+#Create SeqExpressionSet, which contains counts, labels for the
+#samples and GC content/length
+counts <-  newSeqExpressionSet(counts=exprs,
+          phenoData=data.frame(conditions = factor(colnames(geneLevelDataFilter))),
+          featureData=AnnotatedDataFrame(data.frame(gc=yeastGC[sub],
+          length = yeastLength[sub])))
+
+
+
+```
+
+`r zero_yeast` genes have all zeros as counts. `r onezero_yeast` genes have at least one sample with a zero. 
+
+### (b) For the following plots, use the log scale
+
+```{r plots, fig.width= 9, fig.height= 6}
+par(mfrow = c(1,2))
+## To plot the counts by sample
+boxplot(counts)
+
+## plot the mean by variance plot
+## a smoothScatter plot of the mean variance relation
+## a lowess fit 
+meanVarPlot(counts, log = T)
+
+## To assess any biases by GC content
+biasPlot(counts, "gc", log=TRUE)
+
+## To assess any biases by length
+biasPlot(counts,"length", log=TRUE )
+
+```
+
+
+### (c) Apply withinLaneNormalization() to normalize by GC content.
+
+```{r normalizebyGC_within, fig.width= 9, fig.height= 6}
+par(mfrow = c(1,2))
+## which=c("loess","median","upper","full")
+## normalize by GC content
+## which = "loess"
+norm_loess <- withinLaneNormalization(counts, "gc", which = "loess", offset=FALSE)
+biasPlot(norm_loess, "gc", log=TRUE)
+
+## which = "median"
+norm_median <- withinLaneNormalization(counts, "gc", which = "median", offset=FALSE)
+
+biasPlot(norm_median, "gc", log=TRUE)
+
+## which = "upper"
+norm_upper <- withinLaneNormalization(counts, "gc", which = "upper", offset=FALSE)
+
+biasPlot(norm_upper, "gc", log=TRUE)
+
+
+## which = "full"
+norm_full <- withinLaneNormalization(counts, "gc", which="full", offset=FALSE)
+
+biasPlot(norm_full, "gc", log=TRUE)
+
+
+```
+
+### (d) Using the within-lane normalized data from the previous part
+
+```{r betweenLane, fig.width= 9, fig.height= 6}
+par(mfrow = c(1,2))
+biasPlot(counts, "gc", log=TRUE)
+## "median","upper","full"
+bet_norm_median <-  betweenLaneNormalization(norm_median , which="median", offset=FALSE)
+biasPlot(bet_norm_median, "gc", log=TRUE)
+
+bet_norm_upper <-  betweenLaneNormalization(norm_upper , which="upper", offset=FALSE)
+biasPlot(bet_norm_upper, "gc", log=TRUE)
+
+bet_norm_full <-  betweenLaneNormalization(norm_full , which="full", offset=FALSE)
+biasPlot(bet_norm_full, "gc", log=TRUE)
+```
+
+
+
 
 
