@@ -1,0 +1,117 @@
+---
+title: "7659 HW6"
+author: "Guannan Shen"
+date: "October 30, 2018"
+output: 
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+## setting wd in DELL
+## opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
+## setting working directory in asus 
+opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/") 
+## setting working directory in ubuntu
+## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+
+```{r libs}
+## set up workspace
+library(knitr)
+library(tidyverse)
+library(edgeR)
+library(cqn)
+library(DESeq)
+options(stringsAsFactors = F)
+options(dplyr.width = Inf)
+getwd()
+## not in function
+'%nin%' <- Negate('%in%')
+
+# ######## clean memory ######################
+# rm(list = ls())
+# gc()
+
+```
+
+#HW6  
+
+## 1. Next Generation Sequencing: Differential Expression
+
+### (a) Calculate the RPKM for each gene in montgomery.subset using your own code
+
+```{r RPKM }
+## montgomery data from cqn
+data(montgomery.subset)
+## GC and gene length of montgomery
+data(uCovar)
+## total reads 
+## vector of length 10 containing the number of mapped reads for each sample
+data(sizeFactors.subset)
+
+dim(montgomery.subset)
+dim(uCovar)
+head(montgomery.subset)
+head(uCovar)
+
+#### number of genes 
+  n1 <-  nrow(uCovar)
+  n2 <- length(montgomery.subset)
+
+## the two groups are the first 1-5 subjects and then the second five subjects 6-10.
+rpkm <- function(counts, length, total){
+  ## The RPKM
+  RPKM = counts/(length/1000 * total/1000000 )
+}
+##the matrix to store
+mont.rpkm <- matrix(NA, nrow = n1, ncol = n2)
+
+## calculate the rpkm for whole dataset 
+for(i in 1:n2){
+  total <- sizeFactors.subset[i]
+  for(j in 1:n1){
+    counts <- montgomery.subset[j,i]
+    length <- uCovar[j,1]
+    mont.rpkm[j,i] <- rpkm(counts, length, total )
+  }
+}
+head(mont.rpkm)
+
+## the normalized data is mont.rpkm 
+
+```
+
+
+## 2. Next Generation Sequencing: Method Comparisons (access data from Recount.)
+
+```{r }
+
+```
+
+
+
+
