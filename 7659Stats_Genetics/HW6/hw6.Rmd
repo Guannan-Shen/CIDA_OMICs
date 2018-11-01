@@ -3,14 +3,14 @@ title: "7659 HW6"
 author: "Guannan Shen"
 date: "October 30, 2018"
 output: 
-  word_document:
-    toc: yes
-    toc_depth: '5'
   pdf_document:
     latex_engine: lualatex
     number_sections: yes
     toc: yes
     toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
   html_document:
     number_sections: yes
     theme: united
@@ -29,9 +29,9 @@ knitr::opts_chunk$set(warning = F)
 ## setting wd in DELL
 ## opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
 ## setting working directory in asus 
-opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/") 
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/") 
 ## setting working directory in ubuntu
-## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/")
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW6/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -62,7 +62,7 @@ getwd()
 
 ## 1. Next Generation Sequencing: Differential Expression
 
-### (a) Calculate the RPKM for each gene in montgomery.subset using your own code
+### (a) Calculate the RPKM for each gene in montgomery.subset using your own code. And show top genes by t-test.
 
 ```{r RPKM }
 ## montgomery data from cqn
@@ -80,6 +80,7 @@ head(uCovar)
 
 #### number of genes 
   n1 <-  nrow(uCovar)
+### number of samples 
   n2 <- length(montgomery.subset)
 
 ## the two groups are the first 1-5 subjects and then the second five subjects 6-10.
@@ -102,16 +103,233 @@ for(i in 1:n2){
 head(mont.rpkm)
 
 ## the normalized data is mont.rpkm 
+## # carry out individual t-tests
+## welch t-test
+
+indi <- lapply(1:n1, function(row){
+  test = t.test(mont.rpkm[row, 1:5], mont.rpkm[row, 6:10], alternative = "two.sided")
+  test.sum = c(rownames(uCovar)[row] , test$p.value, test$statistic)
+  test.sum
+})
+indi_t <- data.frame(matrix(unlist(indi), ncol = 3, byrow = TRUE))
+colnames(indi_t) <- c("genenames", "pvalue", "tstatistic")
+indi_t <- indi_t %>%mutate(pvalue = as.numeric(pvalue), 
+                           tstatistic = as.numeric(tstatistic))  
+##  top10 genes
+kable(head(indi_t[order(abs(indi_t$pvalue), decreasing = F), ], 10), 
+              caption = "Top10 Genes by gene-specific t-test")
 
 ```
+
+### (b) It is good practice to plot the histogram of p-values. What shape would be expected? Plot the histogram of p-values from part a). What do you see? Extra Credit: What explains the odd pattern that you find?
+
+I would expect to see a spike at small p-value region, in other words, at the far left end of the x-axis, and a uniform distribution of p-value elsewhere. In terms of this dataset, there is a big spike located around p-value = 0.375 and an approximately uniform distribution elsewhere. In my opinion, this odd pattern occured might because the RPKM normalization method did not work well here, influenced by highly expressed genes in some samples. Thus, the normalized data had a lot genes have similar values, for instance, a lot of zeros and ones, lead to a p-value spike at 0.375.  
+
+```{r plotp}
+ggplot(indi_t, aes(pvalue)) +
+  geom_histogram(binwidth = 0.01, bins = 30) +
+  scale_x_continuous(breaks = c(0.000, 0.125, 0.250, 0.375,
+                                0.500, 0.625, 0.750, 0.875, 1.000)) +
+  theme_bw()
+
+```
+
+### (c) How many genes have at least 10 counts across subjects (i.e., total sum across the gene ≥ 10)? Create a new data frame with only those genes. 
+
+```{r filtered}
+## number of genes have at least 10 counts across subjects 
+n10 <- sum(rowSums(montgomery.subset) >= 10)
+## filtered data
+mont.filtered <- montgomery.subset[rowSums(montgomery.subset) >= 10, ] 
+## create an edgeR object
+group.dge <- rep(c(1,2), each=5)
+mont.dge <- DGEList(counts=mont.filtered, group=group.dge)
+## the library size after filtering 
+mont.dge$samples$lib.size
+colSums(mont.filtered)
+
+```
+
+There are `r n10` genes have at least 10 counts across subjects. The DGEList includes the lib.size as colSums by default. 
+
+### (d) Using the estimateCommonDisp() function, what is the common dispersion estimate? Using the estimateTagwiseDisp() function, plot a histogram of the dispersion estimate for each gene. 
+
+```{r dispersion}
+## the common dispersion estimate 
+mont.comDis <- estimateCommonDisp(mont.dge)
+mont.comDis$common.dispersion
+
+## dispersion estimate for each gene
+mont.tagDis <- estimateTagwiseDisp(mont.comDis)
+hist(mont.tagDis$tagwise.dispersion,
+     xlab =  "genewise dispersion estimations", breaks = 50)
+abline(v = median(mont.tagDis$tagwise.dispersion), 
+       col="red", lwd=1, lty=2)
+text(0.5, 4000, paste("Median = ", 
+                      median(mont.tagDis$tagwise.dispersion),sep = ""), pos=4)
+
+     
+```
+
+The common dispersion estimated is `r mont.comDis$common.dispersion`. According to the User's guide, edgeR uses the quantile-adjusted conditional maximum likelihood (qCML) method for experiments with single factor. This method performs best in the situation of many small samples with a common dispersion. The common dispersion is slightly larger than the median of the gene level dispersion estimates. This indicates the majority of genes have a dispersion close to the common dispersion. However, there still exists a long tail at the right end. 
+
+### (e) Fit the negative binomial model (see Section 2.9.2 and 3.2 in the User’s Guide) and test for differential expression using the common dispersion estimate and report the final results for the top 10 genes. How do the results change between the two approaches?
+
+```{r nb}
+## with common dispersion
+et.com <- exactTest(mont.comDis)
+topTags(et.com)
+## get genes names 
+com_10 <- rownames(topTags(et.com))
+com_10
+## with genewise dispersion
+et.tag <- exactTest(mont.tagDis) 
+topTags(et.tag)
+tag_10 <- rownames(topTags(et.tag))
+tag_10
+## inner joint
+top_top <- com_10[com_10 %in% tag_10]
+top_top
+
+```
+
+The exact test is based on the qCML methods. With common dispersion approach, only one parameter was estimated. Thus, the top10 genes have overall much smaller p-values and adjusted p-values (FDR). Based on FDR, only 7 genes in the genewise approach have adjusted p values less than 0.05. This approach estimated more parameters, has less power. Nevertheless, 3 genes in Top10 list were shared by two approaches: `r top_top`. 
+
+### (f) For the top 10 genes based on the common dispersion, extract the raw counts (counts are contained in the counts value in the DGEList you created). What counts do you observe across the subjects for these genes? Using Ensembl what type of genes are in the top list?
+
+```{r top10}
+# human RNA-seq data from
+# lymphoblastoid cells 
+## raw counts of common 
+mont.dge$counts[rownames(mont.dge$counts) %in% com_10, ]
+
+## raw counts of tag
+mont.dge$counts[rownames(mont.dge$counts) %in% tag_10, ]
+
+```
+
+The raw counts for top10 genes by the common dispersion approach was shown above. Some genes with extremely high expression in some samples were selected by this method. Even though the high expression level are not consistent across samples within the group. It seems like the p-value was decided by only one sample in the group, while others are just zeros. Because this method does not take gene level variation into account. Usually, high expression genes tend to have high variations. In general, by looking at the raw counts, this approach is defective. By the Ensembl, most of the top10 genes are Immunoglobulin components. It is not surprising that this is RNA-Seq data from human lymphoblastoid cells. The top10 genes may not be interesting to the investigators.  
+
+The raw counts by genewise approach are more reasonable. Top10 genes here tend to have more consistent raw counts within the group. And the difference between groups is on the group level, not caused by one or two samples from a group. Compared with the previous one, this method makes more sense. By the Ensembl, top10 genes are much more diverse. There are Glutathione S-transferase, Immunoglobulin, Mab-21 domain containing 2, NACC family member 2, Procollagen-lysine etc. This top10 gene list may be more interesting and informative to the investigators. 
 
 
 ## 2. Next Generation Sequencing: Method Comparisons (access data from Recount.)
 
-```{r }
+### (a) Create a new data frame with genes that have at least 10 counts (summed across samples). How many genes are kept? 
+
+```{r recount}
+load(url("http://bowtie-bio.sourceforge.net/recount/ExpressionSets/bottomly_eset.RData"))
+library(Biobase)
+phenoData(bottomly.eset) #gives information about the table
+## phenoData(bottomly.eset)@data #outputs the table
+phenoData(bottomly.eset)$strain #gives mouse strain variable as vector
+featureNames(bottomly.eset)[1:10] # gives first 10 genes in count table
+bottomly.count.table <- exprs(bottomly.eset) #creates count table
+dim(bottomly.count.table) #36536x21
+head(row.names(bottomly.count.table)) #names of genes
+
+## genes that have at least 10 counts
+n10.bot <- sum(rowSums(bottomly.count.table) >= 10)
+## filtered dataset 
+bottom.filter <-  bottomly.count.table[rowSums(bottomly.count.table) >= 10, ]
+dim(bottom.filter)
+## DESeq dataset 
+condition.bot <- phenoData(bottomly.eset)$strain
+cds.bot <- newCountDataSet(bottom.filter, condition.bot)
+
+## edgeR
+bot.dge <- DGEList(counts=bottom.filter, group=condition.bot)
 
 ```
 
+There are `r n10.bot` genes kept. 
 
+### (b) Calculate the size factors
+```{r sizefactor}
+## size factor for DESeq
+cds <- estimateSizeFactors(cds.bot)
+sizeFactors(cds)
+
+## size factor for edgeR TMM
+y <- calcNormFactors(bot.dge)
+y$samples$norm.factors
+
+```
+
+Size factors are used for normalization. Size factors are the effective library sizes. For instance, in terms of two group comparison scenario, if the library was sequenced twice as deeply as the other one, lead to the counts of non-differentially expressed genes in one sample are, on average, twice as high as in another. The size factor in group 1 is the twice of the group 2.   
+
+The size factors calculated by DESeq range from 0.578 to 1.616, however, size factors by the 2nd method are basically distributed around 1. Based on the TMM method, there is no sizable/obvious difference of library sizes among samples. However, since those samples labeled by different experiment number, size factors calculated by DESeq are more reasonable. 
+
+### (c) Calculate the DESeq dispersions using the "local" method
+
+```{r dispersionDESeq}
+## dispersion by DESeq
+cds <-  estimateDispersions(cds)
+plotDispEsts(cds)
+
+hist(fitInfo(cds)$fittedDispEsts,
+     xlab =  "fitted dispersion estimations", breaks = 50)
+abline(v = median(fitInfo(cds)$fittedDispEsts), 
+       col="red", lwd=1, lty=2)
+text(0.5, 4000, paste("Median = ", 
+                      median(fitInfo(cds)$fittedDispEsts), sep = ""), pos=4)
+
+## edgeR
+## ## the common dispersion estimate 
+bot.comDis <- estimateCommonDisp(bot.dge)
+
+## dispersion estimate for each gene
+bot.tagDis <- estimateTagwiseDisp(bot.comDis)
+hist(bot.tagDis$tagwise.dispersion,
+     xlab =  "genewise dispersion estimations", breaks = 50)
+abline(v = median(bot.tagDis$tagwise.dispersion), 
+       col="red", lwd=1, lty=2)
+text(0.5, 4000, paste("Median = ", 
+                      median(bot.tagDis$tagwise.dispersion), sep = ""), pos=4)
+
+
+
+```
+
+In general, two sets of dispersions are very close, except that the dispersion estimates from the DESeq are more obviously right skewed. The variance of y is modelled as $v = s\mu + \alpha s^2 \mu^2$ in DESeq, where $\mu$ is the expected nomarlized count value. $s$ is the size factor, $\alpha$ is the dispersion value. In comparison, in edgeR, the variance of y is modelled as $v = \mu + \phi \mu^2$. The difference is the size factor and the square root in the two equations. The dispersion by edgeR is like the square root tranformation of the one by DESeq, thus the former is less right skewed. In addition, the size factors in DESeq also impact the estimation of the dispersion to some extent. 
+
+### (d) Test for differences between the two strains using DESeq
+
+```{r DESeq}
+## DE by DESeq
+res <- nbinomTest(cds, "C57BL/6J", "DBA/2J" )
+res.p <- res %>% filter(padj <= 0.05)
+
+## number of sig by DESeq
+n.deseq <- nrow(res.p)
+
+## edge R
+et.bot.tag <- exactTest(bot.tagDis) 
+## calculate BH adjusted p
+et.bot.tag$table$padj <-  p.adjust(et.bot.tag$table$PValue, method = "BH")
+###
+bot.p <- et.bot.tag$table %>% filter(padj <= 0.05) %>% 
+          mutate(id = rownames(et.bot.tag$table)[et.bot.tag$table$padj <= 0.05] ) %>% select(id, everything())
+n.bot <- nrow(bot.p)
+
+## overlap 
+sum(bot.p$id %in% res.p$id)
+
+## choose one not overlap
+set.seed(1)
+ran.gene <- sample(bot.p$id[ bot.p$id %nin% res.p$id ], 1)
+ran.gene
+
+## DESeq sample
+res[res$id == ran.gene, c(1, 5:8) ]
+## edgeR
+bot.p[bot.p$id == ran.gene, ]
+
+
+```
+
+`r n.deseq` genes are found to be differentially expressed by DESeq. `r n.bot` genes are found to be differentially expressed by edgeR. The DESeq method is more stringent. The genes found by DESeq are all covered by the significant gene list of edgeR. Thus there are `r n.deseq` overlapping genes. 
+
+I randomly sampled one gene: `r ran.gene`. For this gene, the logFC after normalization is slightly larger by the edgeR method. Meanwhile, the p value is much smaller in edgeR. Thus, we know that the variation of counts for this gene estimated by edgeR is much smaller compared with DESeq. In this way, we have the smaller p-value by edgeR.  
 
 
