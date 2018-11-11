@@ -1,0 +1,81 @@
+---
+title: "HW7"
+author: "Guannan Shen"
+date: "November 10, 2018"
+output: 
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+
+```{r setup, include=FALSE, cache = FALSE}
+require("knitr")
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+opts_chunk$set(engine = "R")
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = F)
+knitr::opts_chunk$set(warning = F)
+## setting wd in DELL
+## opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
+## setting working directory in asus 
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW5/") 
+## setting working directory in ubuntu
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW7/")
+                                                 
+## cache = F, if cache = T, will not revaluate code chunk everytime
+## double or more space to insert a line break
+```
+
+
+```{r libs}
+## set up workspace
+library(knitr)
+library(tidyverse)
+library(magrittr)
+library(shinyMethyl)
+library(minfi)
+library(bumphunter)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+options(stringsAsFactors = F)
+options(dplyr.width = Inf)
+getwd()
+## not in function
+'%nin%' <- Negate('%in%')
+
+# ######## clean memory ######################
+# rm(list = ls())
+# gc()
+
+```
+
+# 1. DNA Methylation QC and Normalization (Illumina 450K)
+## Introduction
+• For problems #1 and #2 install the following packages from BioConductor: shinyMethyl, minfi, bumphunter and IlluminaHumanMethylation450kanno.ilmn12.hg19  
+
+• The data for this problem is available through a link on Canvas to the "idats" folder on Dropbox. This is an Illumina 450K dataset from The Cancer Genome Atlas (TCGA) http://cancergenome.nih.gov/
+
+There are two files for the red and green channels from 6 subjects in the colon adenicarcinoma data set (COAD) from: https://portal.gdc.cancer.gov. The clinical and demographic data has been abbreviated in the targets.csv file.  
+
+• Here is the link to the minfi User’s Guide: http://www.bioconductor.org/packages/release/bioc/vignettes/minfi/inst/doc/minfi.html
+
+Here is another reference: https://www.bioconductor.org/help/course-materials/2014/BioC2014/minfi_BioC2014.pdf. For information on the control probes, see page 6-7 http://www.filgen.jp/Product/Bioscience/Methyl/Methylation_report.pdf
+
+• Run the following code to load the raw .idat files. But change your path name, and also the path in the Basename column in the **SampleSheet** file in the idats directory.
+
+baseDir = c("/Users/Katerina/Desktop/7659/homeworks/hw7/idats")
+
+targets = read.metharray.sheet(baseDir)
+rgSet <- read.metharray.exp(targets = targets)
+annotation(rgSet)
+

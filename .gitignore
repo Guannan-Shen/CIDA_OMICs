@@ -12,6 +12,7 @@
 *.sas7bdat
 *.xport
 *.mdb
+*.idat
 DataRaw/
 DataProcessed/
 .DS_Store
