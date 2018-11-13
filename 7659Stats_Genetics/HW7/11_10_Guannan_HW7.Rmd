@@ -46,6 +46,7 @@ library(magrittr)
 library(shinyMethyl)
 library(minfi)
 library(bumphunter)
+library(qwraps2)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 options(stringsAsFactors = F)
 options(dplyr.width = Inf)
@@ -60,6 +61,7 @@ getwd()
 ```
 
 # 1. DNA Methylation QC and Normalization (Illumina 450K)
+
 ## Introduction
 • For problems #1 and #2 install the following packages from BioConductor: shinyMethyl, minfi, bumphunter and IlluminaHumanMethylation450kanno.ilmn12.hg19  
 
@@ -78,4 +80,338 @@ baseDir = c("/Users/Katerina/Desktop/7659/homeworks/hw7/idats")
 targets = read.metharray.sheet(baseDir)
 rgSet <- read.metharray.exp(targets = targets)
 annotation(rgSet)
+
+## (a) In clinical manuscripts, the first table often includes summaries of clinical and demographic data (e.g., disease status, race, age, etc.).
+There are 3 unique subjects/patients, each patient provided two different biopsies. 
+
+```{r a450k}
+# load dataset 
+baseDir = c("~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW7/idats")
+targets = read.metharray.sheet(baseDir)
+rgSet <- read.metharray.exp(targets = targets)
+annotation(rgSet)
+# clinical, demagraphics data
+table1data <- pData(rgSet)
+colnames(table1data)
+table1.1 <- as.data.frame(table1data) %>% dplyr::rename(Age = patient.age_at_initial_pathologic_diagnosis,
+                                         Height = patient.height,
+                                         Weight = patient.weight,
+                                         Race = patient.race)
+table1.2 <- table1.1[c(1,3,5),]
+#make table 1
+my_summary_1 <-
+  list("Demographics" =
+       list("Age, mean(SD)" =  
+              ~ qwraps2::mean_sd(Age, denote_sd = "paren"),
+            "Female, No. (%)" = ~ n_perc0(Sex == "FEMALE"),
+            "Height, mean(SD)" = ~ mean_sd(Height, denote_sd = "paren"),
+            "Weight, mean(SD)" = ~ mean_sd(Weight, denote_sd = "paren"),
+            "White, No. (%)" = ~ n_perc0(Race == "WHITE"),
+            "Black, No. (%)" = ~ n_perc0(Race == "BLACK OR AFRICAN AMERICAN"))
+  )
+# clinical part table 1
+my_summary_2 <-
+  list("Clinical Status" =
+       list("Colon Tissue, No. (%)" = ~ n_perc0(Tissue == "colon"),
+       "Cancer Tissue, No. (%)" = ~ n_perc0(Status == "cancer"),
+       "Normal Tissue, No. (%)" = ~ n_perc0(Status == "normal"))
+  )
+
+```
+
+```{r table1}
+tab1 <- rbind(summary_table(table1.2, my_summary_1), summary_table(table1.1, my_summary_2))
+rownames(tab1)
+kable(tab1, col.names = "Subjects = 3, Samples = 6")
+```
+
+
+## (b) From the array annotation information given by getManifest(rgSet), how many Type I and II probes are there?
+Number of type I probes: 135476   
+
+Number of type II probes: 350036 
+
+```{r anno}
+getManifest(rgSet)
+```
+
+## (c) Display QC plots. In the information from the "targets" file, use "id" for sampNames and repeat the QC plots on "sample type" and "Sex" for sampGroups to see if there are differences in cancer versus normal subjects or by sex. Do you see any differences in the beta values between sample type or sex using the QC reports? Are there any samples that appear to be problematic?
+Beta values are between 0 and 1 with 0 being unmethylated and 1 fully methylated.
+
+There is no obvious difference in the Beta values by gender based on the density plots. However, primary tumor sample appear to have higher unmethylated peaks.
+
+The default in the function displayed control probes "BISULFITE CONVERSION I" and "BISULFITE CONVERSION II". These controls assess the efficiency of bisulfite conversion of the genomic DNA. During the experimental procedure, the unmethylated C was converted to T. "BISULFITE CONVERSION I" uses the type I probe design, and another one uses infinium II probe design. Red or green channel is to monitor the converted probes or unconverted, separately. In terms of this study, there is no sample appears to be problematic. 
+
+```{r QC}
+# labels 
+groups_sex <- pData(rgSet)$Sex
+groups_sample<-pData(rgSet)$sample_type
+pData(rgSet)$sample_type
+sampnames <- pData(rgSet)$id
+# pdf
+densityPlot(rgSet, sampGroups = groups_sex, sampNames = sampnames)
+densityPlot(rgSet, sampGroups = groups_sample, sampNames = sampnames)
+# density bean
+densityBeanPlot(rgSet, sampGroups = groups_sex, sampNames = sampnames)
+densityBeanPlot(rgSet, sampGroups = groups_sample, sampNames = sampnames)
+
+# control
+controlStripPlot(rgSet, sampNames = sampnames)
+
+```
+
+## (d) Describe their purpose of the different control probes on the array (see link above and help(qcReport)).
+
+Different control probes work as quality controls.
+
+Staining controls are used to examine the efficiency of the staining step in both the red and green channels.
+
+Extension controls test the extension efficiency. 
+
+The default in the function displayed control probes "BISULFITE CONVERSION I" and "BISULFITE CONVERSION II". These controls assess the efficiency of bisulfite conversion of the genomic DNA. During the experimental procedure, the unmethylated C was converted to T. "BISULFITE CONVERSION I" uses the type I probe design, and another one uses infinium II probe design. Red or green channel is to monitor the converted probes or unconverted, separately. Type II only has one peak at each of red or green channel, while type I has dual peaks at each color channel. 
+
+Negative controls target bisulfite-converted sequences that do not contain CpG dinucleotides. This is to assess the system background by the mean signals from the negative controls, which should be done in both green and red channel.  
+
+The ranges of "BISULFITE CONVERSION I" are consistent across samples, telling us both channel has methylated and unmethylated signals. The ranges of negative controls show that the background intensities are around 8 (log2), and are relatively consistent across samples. The data is reliable. 
+
+
+```{r controlprobes}
+help(qcReport)
+controlStripPlot(rgSet, sampNames = sampnames, 
+                 controls = c("BISULFITE CONVERSION I", "NEGATIVE"))
+```
+
+
+## (e) Illumina also reports detection p-values, how are these calculated? Using the function detectionP(), which sample had the largest percentage of detection pvalues ≥ 0.05? How many probes have average detection p-value ≥ 0.05 across the 6 samples?
+
+```{r detectionp}
+de_p <-  as.data.frame( detectionP(rgSet) )
+colnames(de_p) <- sampnames
+## large p proportion
+de_p_prop <- sort(apply(de_p, 2, function(x) {
+  sum(x >= 0.05)/length(x)
+}))
+de_p_prop
+de_p_prop[6]
+names(de_p_prop)[6]
+
+## average p 
+n_de_p <- sum(rowMeans(de_p) >= 0.05)
+n_de_p
+nrow(de_p)
+
+
+```
+
+The detection p-values are calculated as $p = 1 - \phi[(x - \mu_{neg})/\sigma_{neg}]$, where $\phi$ is the normal density function, $x$ is the sum of two beads (Type I) or sum of two color intensities (Tpye II), the $\phi$ takes the Z score as the input. The sample with id `r names(de_p_prop)[6]` has the largest percentage of detection pvalues >= 0.05, `r de_p_prop[6]`. `r n_de_p` probes have average detection p-value >= 0.05 across
+the 6 samples. 
+
+## 2nd Introduction
+Save the methylation signals using the preProcess series of functions for the Raw data (without normalization) and the SWAN normalization method.  
+
+mset <- preprocessRaw(rgSet)
+
+msetSWAN <- preprocessSWAN(rgSet)
+
+```{r swan}
+# swan normalization
+mset <- preprocessRaw(rgSet)
+msetSWAN <- preprocessSWAN(rgSet)
+## cancer status
+cancer.status <- pData(rgSet)$Status
+## multidimensional scaling (MDS) plots
+paste("By sex or by cancer status")
+mdsPlot(msetSWAN, numPositions = 1000, 
+        sampGroups = groups_sex, sampNames = sampnames, legendPos = "bottom")
+mdsPlot(msetSWAN, numPositions = 1000, 
+        sampGroups = cancer.status, sampNames = sampnames, legendPos = "bottomleft")
+
+mdsPlot(msetSWAN, numPositions = 10000, 
+        sampGroups = groups_sex, sampNames = sampnames, legendPos = "bottom")
+mdsPlot(msetSWAN, numPositions = 10000, 
+        sampGroups = cancer.status, sampNames = sampnames, legendPos = "bottom")
+paste("Raw Data")
+mdsPlot(mset, numPositions = 1000, 
+        sampGroups = groups_sex, sampNames = sampnames, legendPos = "bottom")
+mdsPlot(mset, numPositions = 1000, 
+        sampGroups = cancer.status, sampNames = sampnames, legendPos = "bottomleft")
+
+mdsPlot(mset, numPositions = 10000, 
+        sampGroups = groups_sex, sampNames = sampnames, legendPos = "bottom")
+mdsPlot(mset, numPositions = 10000, 
+        sampGroups = cancer.status, sampNames = sampnames, legendPos = "bottom")
+
+##
+plotBetasByType(mset[,1], main = "Raw Data id = 1")
+plotBetasByType(msetSWAN[,1], main = "Normalized Data id = 1")
+
+plotBetasByType(mset[,6], main = "Raw Data id = 6")
+plotBetasByType(msetSWAN[,6], main = "Normalized Data id = 6")
+
+```
+
+
+## (f) Use multidimensional scaling (MDS) plots to show how samples group by sex or cancer status with mdsPlot(). What do you conclude? Are conclusions different if you take more positions with the most methylation variability (1000 vs 10000 positions)? or by using the raw data mset compared to the SWAN normalized data msetSWAN?
+
+With SWAN normalization data, the samples can be grouped by gender (linear separation) based on 1000 positions. However, the methylation data cannot separate the samples correctly as different tissue types. Compared to the 10000 positions MDS plot, the 1000 positions data gives a better separation. I cannot get the same conclusion from the 10000 positions MDS plot. By using the raw data mset, the conclusion remains the same as the normalized data. 
+
+## (g) Plot the distribution of beta values before and after SWAN normalization using plotBetasByType(). What do you see in the density plots?
+
+After SWAN normalization, for example, sample 1 and sample 6 here, the peaks at unmethylation region and methylation region of all probes become equally weighted. The unmethylation peaks come from type I and type II probes are merged together afther SWAN normalization.  
+
+# 2. DNA Methylation Annotation and Differentially Methylated Positions (Illumina 450K)
+
+• Continuing with the the data from problem #1, get genome annotation information using the following code:
+
+gset <-mapToGenome(msetSWAN)
+
+annotation <-getAnnotation(gset)
+
+```{r genes}
+#map cpg to genome 
+gset <-mapToGenome(msetSWAN)
+annotation <-getAnnotation(gset)
+levels( as.factor(annotation$Relation_to_Island) )
+## in each region
+cpg_island <- sum(annotation$Relation_to_Island == "Island")
+cpg_Shelf <- sum(annotation$Relation_to_Island == "N_Shelf" | annotation$Relation_to_Island == "S_Shelf")
+cpg_Shore <- sum(annotation$Relation_to_Island == "N_Shore" | annotation$Relation_to_Island == "S_Shore")
+cpg_OpenSea <- sum(annotation$Relation_to_Island == "OpenSea")
+
+cpg_island
+cpg_Shelf
+cpg_Shore
+cpg_OpenSea
+```
+
+## (a) What are CpG islands, shores, shelves and open seas? From annotation() how many CpG site probes are in each of these types?
+
+CpG island is defined by the gene region G+C content > 0.50, CpG dinucleotide ratio > 0.60 and has > 200bp window, 40-50% genes have CpG islands in promoters. CpG shores are gene sequences within 2000bp region to the left or right of the CpG island (Up to 2kb from CpG island). CpG shelfs are gene sequences within 2000bp region to the left or right of the CpG shores (2-4 kb from CpG island). Open Seas are Isolated CpGs in the genome. There are `r cpg_island` CpG site probes in CpG islands. There are `r cpg_Shelf` CpG site probes in CpG Shelf. There are `r cpg_Shore` CpG site probes in CpG Shore. There are `r cpg_OpenSea` CpG site probes in CpG OpenSea.
+
+
+## (b) Using the SWAN normalized data from problem #,1 msetSWAN, find differentially methylated positions (DMP) for cancer status with getM(), followed by dmpFinder() (which currently does not handle paired samples, so you will need to run it assuming independence). Are there any DMPs with q-value ≤ 0.10? Using a p-value cutoff of 10−5, how many DMPs show hyper or hypomethylation due to cancer status? Use plotCpg() to plot the beta values and then M-values for the top four DMPs. What do trends and effect sizes do you see in the plots?
+
+```{r dmp}
+# m values 
+mvalue <- getM(msetSWAN)
+
+## cancer status
+cancer.status <- pData(rgSet)$Status
+
+## dmp by cancer 
+dmp_m_c <- dmpFinder(mvalue, pheno = cancer.status, type = c("categorical") )
+head(dmp_m_c)
+head(dmp_m_c[order(dmp_m_c$pval, decreasing = F), ])
+dmp_cancer <- sum(dmp_m_c$pval <= 0.00001)
+dmp_cancer 
+
+
+## plotCpg() to plot the beta values and then M-values for the top four DMPs
+par(mfrow = c(1,2))
+for(i in rownames(dmp_m_c[order(dmp_m_c$pval, decreasing = F), ])[1:4]){
+plotCpg(msetSWAN, cpg =  i, pheno = cancer.status, type = c("categorical"),
+        measure = c( "M"))
+}
+for(i in rownames(dmp_m_c[order(dmp_m_c$pval, decreasing = F), ])[1:4]){
+plotCpg(msetSWAN, cpg =  i, pheno = cancer.status, type = c("categorical"),
+        measure = c( "beta"))
+}
+## dmp by gender
+dmp_m_g <- dmpFinder(mvalue, pheno = groups_sex, type = c("categorical") )
+head(dmp_m_g)
+head(dmp_m_g[order(dmp_m_g$pval, decreasing = F), ])
+dmp_gender <- sum(dmp_m_g$pval <= 0.00001)
+dmp_gender
+
+for(i in rownames(dmp_m_g[order(dmp_m_g$pval, decreasing = F), ])[1:4]){
+plotCpg(msetSWAN, cpg =  i, pheno = groups_sex, type = c("categorical"),
+        measure = c( "M"))
+}
+for(i in rownames(dmp_m_g[order(dmp_m_g$pval, decreasing = F), ])[1:4]){
+plotCpg(msetSWAN, cpg =  i, pheno = groups_sex, type = c("categorical"),
+        measure = c( "beta"))
+}
+
+
+```
+
+
+There are no DMPs with q-value ≤ 0.10. With a p-value cutoff of 0.00001, there are `r dmp_cancer` DMPs show hyper or hypomethylation due to cancer status.  
+
+M values:  
+By the top 4 CpGs, the cancer group is hypomethylated, since the cancer samples have smaller M values. However, the difference between cancer sample and normal sample on the individual CpG level is small, around 0.4 to 1. The Beta values are more close and less obvious, but the trends are the same as the M values. 
+
+
+
+## (c) Repeat part b) but for DMPs between male and females.
+There are no DMPs with q-value ≤ 0.10. With a p-value cutoff of 0.00001, there are `r dmp_gender` DMPs show hyper or hypomethylation due to gender. 
+
+M values:  
+By the top 4 CpGs, 3 Female samples are hypomethylated, and one Female sample is hypermethylated. The differences by gender are larger compared with differences by cancer status, generally. To be specific, the differences of top4-p-value CpGs range from 1 to 3. Since here we have greater effect sizes, the trend and effect sizes in Beta values are also obvious. 
+
+
+## (d) Global methylation profiles vary by sex. There is a function addSex() to estimate whether each sample is male or female. Are the predicted and given labels correct for Sex? If not, revisit the MDS plot from part 1e)? Do the new predictions group in the plot? Also repeat the analysis in 2c). Now are there DMPs with q-value ≤ 0.10 (or p-value ≤ 10−5)?
+
+
+
+```{r sex}
+gset = addSex(gset)
+cbind(pData(gset)$predictedSex, pData(gset)$Sex)
+# mds plot by predictedsex
+pre_sex <- pData(gset)$predictedSex
+
+paste("By sex or by cancer status")
+mdsPlot(msetSWAN, numPositions = 1000, 
+        sampGroups = pre_sex, sampNames = sampnames, legendPos = "bottom")
+
+## DMP by predicted sex
+dmp_pre_sex  <- dmpFinder(mvalue, pheno = pre_sex, type = c("categorical") )
+head(dmp_pre_sex )
+n_pre_sex <- sum(dmp_pre_sex$qval <= 0.1)
+n_pre_sex
+
+## plots 
+par(mfrow = c(1,2))
+for(i in rownames(dmp_pre_sex[order(dmp_pre_sex$pval, decreasing = F), ])[1:4]){
+plotCpg(msetSWAN, cpg =  i, pheno = pre_sex, type = c("categorical"),
+        measure = c( "M"))
+}
+for(i in rownames(dmp_pre_sex[order(dmp_pre_sex$pval, decreasing = F), ])[1:4]){
+plotCpg(msetSWAN, cpg =  i, pheno = pre_sex, type = c("categorical"),
+        measure = c( "beta"))
+}
+
+```
+
+The sex was not predicted correctly. The new gender predictions can be grouped in the mdsplot, and are linear separable. In other words, we can draw a straight roughly horizontal line to separate samples by gender. However, since the sample size is small, the clustering is not good. With new predicted gender, there are `r n_pre_sex` CpGs with q-value ≤ 0.10. With predicted gender, the trends and effect sizes in M values and Beta values change a lot. 
+
+
+## (e) This sample data set is too small for bumphunter to identify significant regions by performing permutations or bootstrap. However, we can use the getSegment() function to find regions of extreme values for the differences found in part b). 
+
+
+
+```{r bumphunter}
+diffs <- dmp_m_c$intercept #NOTE: dmp_m_c is where you saved results from part b)
+chr <- annotation$chr
+pos <- annotation$pos
+cl <- clusterMaker(chr, pos, maxGap = 300) #cluster probes
+#Find regions with a stretch of differences
+segs <- getSegments(diffs, f = cl, cutoff = 6)
+#To plot one of the regions
+ind = segs$dnIndex[[1]]
+segs$dnIndex
+
+length(segs$dnIndex)
+
+ind
+index <- which(cl==cl[ind[1]])
+ind[1]
+index
+plot(pos[index],diffs[index], xlab=paste("position on", chr[ind[1]]), ylab="diff")
+points(pos[ind], diffs[ind], pch=16, col=2)
+abline(h = 0.05, col = "blue")
+
+```
+
+The getSegments() function identified `r length(segs$dnIndex)` regions with extreme values. Here I plotted the 1st region. In this region, the cancer group is hypomethylated with M value is smaller by 6. Cancer group is hypomethylated shown by the above plotCpg() function. I also noticed, the results from this function is not reproducible. 
 
