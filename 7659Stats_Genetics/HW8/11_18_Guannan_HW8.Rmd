@@ -60,6 +60,38 @@ getwd()
 ```
 
 # 1. Cell Type Composition
+Background on data set: The occurrence of gestational diabetes mellitus (GDM) during pregnancy is believed to alter obesity risk of offspring later in life. It was hypothesized that exposure to maternal GDM in utero will be associated with changes in DNA methylation patterns of key genes and pathways in the offspring, which will mediate the association between in utero exposure and childhood adiposity-related outcomes. Data was collected from the EPOCH (Exploring Perinatal Outcomes in CHildren) study, a historical prospective cohort that enrolled children aged 10.5 on average (T1) who were exposed or not exposed to maternal GDM during the intrauterine life. DNA was extracted from peripheral blood samples collected from children at the T1 EPOCH visit on 85 exposed to GDM and 85 unexposed to GDM, and methylation data was generated using the Illumina Infinium HumanMethylation450 BeadChip. We have provided data on a subset of 10 subjects (all Non-Hispanic Whites) from these two groups to identify methylation sites and nearby genes that show differential methylation between the two groups. The data for this problem is available through a link on Canvas to the "blood" folder on Dropbox.
+
+## (a) Use SWAN normalization from Homework 7, then find differentially methylated positions based on exposure status using dmpFinder(). Are there any DMPs with q-value <= 0.10 (or p-value cutoff of 10-5)? Summarize the results in a table and include the direction (hyper or hypo methylated based on exposure status).
+
+```{r SWANDMPS}
+## import data 
+## under directory 
+## ~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW8/
+baseDir1 <- "blood/plate1"
+targets1 <- read.metharray.sheet(baseDir1)
+baseDir2 <- "blood/plate2"
+targets2 <- read.metharray.sheet(baseDir2)
+targets <- rbind(targets1, targets2)
+
+rgSet <- read.metharray.exp(targets=targets, extended=T)
+#for part c), use "extended =F"
+
+# clinical and groups
+sampleNames(rgSet) = rgSet[[1]]
+getManifest(rgSet)
+clindat <- read.table("blood/demographic.txt", sep="\t", header=T)
+pData(rgSet)$Sample_Group <- clindat$Exposure
+pData(rgSet)$child_sex <- clindat$child_sex
+
+
+```
+
+
+
+
+
+
 
 
 
