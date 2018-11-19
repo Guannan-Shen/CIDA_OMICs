@@ -4,6 +4,16 @@
 **Guannan Shen**  
 **Instructor: Katerina Kechris**
 
+## Methods
+### Samples
+Sample GSM3374613: **Original single cell RNA-seq library** from the 10x genomics 3' end library prep. PBMCs were isolated from a health human donor.  
+
+Sample GSM3374614: ***Resampled* single cell RNA-seq library** from the 10x genomics 3' end library prep. PBMCs were isolated from a health human donor and a LNA probe was used to hybridize selected cells for targeted resequencing.
+
+### Seurat - Guided Clustering Tutorial
+https://satijalab.org/seurat/pbmc3k_tutorial.html
+
+
 ## Reference and Data Resource
 
 ### Preprint Paper

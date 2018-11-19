@@ -13,6 +13,7 @@
 *.xport
 *.mdb
 *.idat
+*.tsv
 DataRaw/
 DataProcessed/
 .DS_Store
