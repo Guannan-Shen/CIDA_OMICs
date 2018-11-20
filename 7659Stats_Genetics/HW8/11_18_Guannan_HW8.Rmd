@@ -40,13 +40,17 @@ opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW8/")
 
 ```{r libs}
 ## set up workspace
+
+library(bPeaks)
 library(knitr)
 library(tidyverse)
+
 library(magrittr)
 library(FlowSorted.Blood.450k)
 library(quadprog)
 library(minfi)
 library(IlluminaHumanMethylation450kmanifest)
+library(stats)
 options(stringsAsFactors = F)
 options(dplyr.width = Inf)
 getwd()
@@ -76,22 +80,261 @@ targets <- rbind(targets1, targets2)
 
 rgSet <- read.metharray.exp(targets=targets, extended=T)
 #for part c), use "extended =F"
-
+rgSet[[1]]
 # clinical and groups
 sampleNames(rgSet) = rgSet[[1]]
 getManifest(rgSet)
 clindat <- read.table("blood/demographic.txt", sep="\t", header=T)
+## grouping 
+class(clindat$Exposure)
+clindat$child_sex
 pData(rgSet)$Sample_Group <- clindat$Exposure
 pData(rgSet)$child_sex <- clindat$child_sex
 
+# swan normalization and exposure groups
+mset <- preprocessRaw(rgSet)
+msetSWAN <- preprocessSWAN(rgSet)
+# m values 
+mvalueset <- getM(msetSWAN)
+## dmp by exposure
+dmp_set <- dmpFinder(mvalueset, pheno = clindat$Exposure, type = c("categorical") )
+
+#sig table
+# 0 rows
+dmp_set[dmp_set$qval <= 0.1, ]
+# 4 rows
+dmp_settop <- dmp_set[dmp_set$pval <= 0.00001, ] %>% 
+  mutate(methy_status = if_else(.$intercept > 0, "hyper-methylated", "hypo-methylated"),
+         CpGs = rownames(.)) %>% dplyr::select(CpGs, everything())
+
+kable(dmp_settop, caption = "Top CpGs by Exposure Status", align = "c")
+
+```
+
+The direction of methylation was defined by the value of intercept, positive intercept means hyper-methylation in exposure status 1. 
+
+
+
+## (b) Because blood is a heterogeneous collection of different cell types, it has been recognized that it may be important to adjust for cell-type composition in your analysis. Why is cell-type composition relevant for DNA methylation studies? What are the methods available to adjust for cell-type composition when celltypes are not directly measured (as in this example)?
+
+Blood is a heterogeneous collection of different cell types, each with a very different DNA methylation profile. Basically, DNA methylation has a very high variability on cell type level. In the Jaffe & Irizarry, Genome Biology (2014) paper, they showed in five previously published studies, cellular composition explained much of the observed variability in DNA methylation. That is, cellular composition is a confounder in blood sample methylation study.  
+
+Methods to estimate cell counts have been developed by different approaches, such as reference-free deconvolution, reference-based deconvolution and Bayesian semi-supervised method (BayesCCE). In this example, the Houseman reference-based method, estimateCellCounts(), implemented in the R package minfi is the optimal method for reference-based deconvolution.
+
+## (c) Estimate cell counts using estimateCellCounts(). Explain the graph that is displayed by this function. Then repeat part a), but include cell-type composition as covariates in your model. Summarize your results again in a table. How do the results compare between the unadjusted and adjusted cell-type composition analysis? Provide possible explanations if you do not see differences.Based on the available clinical data file, discuss what other covariates that you may consider including in the model (no need to implement).
+
+```{r celltype}
+rgSet_F <- read.metharray.exp(targets=targets, extended=F)
+sampleNames(rgSet_F) = rgSet_F[[1]]
+pData(rgSet_F)$Sample_Group <- clindat$Exposure
+pData(rgSet_F)$child_sex <- clindat$child_sex
+
+# swan normalization and exposure groups
+mSet_F <- preprocessRaw(rgSet_F)
+mSet_FSWAN <- preprocessSWAN(rgSet_F)
+# m values 
+mvalueSet_F <- getM(mSet_FSWAN)
+# estimate cell
+cellcount <- estimateCellCounts(rgSet_F, compositeCellType = "Blood", meanPlot = T, 
+                                cellTypes = c("CD8T","CD4T", "NK","Bcell","Mono","Gran"))
+# samples and groups 
+sum(rownames(cellcount) != rgSet_F[[1]])
+cell <- as.data.frame(cellcount)
+cell$exposure <- clindat$Exposure
+# have a look
+cell[1,]
+
+# reference with dmpfinder
+## dmp by exposure
+dmp_Set_F <- dmpFinder(mvalueSet_F, pheno = clindat$Exposure, type = c("categorical") )
+dmp_Set_Ftop <- dmp_Set_F[dmp_Set_F$pval <= 0.00001, ] %>% 
+  mutate(methy_status = if_else(.$intercept > 0, "hyper-methylated", "hypo-methylated"),
+         CpGs = rownames(.)) %>% dplyr::select(CpGs, everything())
+
+kable(dmp_Set_Ftop, caption = "Top CpGs by Exposure Status", align = "c")
+
+# lm 
+n_cpgs <- nrow(mvalueSet_F)
+outcome_lm <-  lapply(1:n_cpgs, function(i){
+  lm = lm(mvalueSet_F[i,] ~ exposure + Bcell + CD4T +
+            CD8T + Gran + Mono + NK, data = cell)
+  coef = c(summary(lm)$coefficients[2, 1], 
+           summary(lm)$coefficients[2, 4])
+  if(i %in% seq(0, 500000, by = 20000)){
+    print(i)
+  }
+  return(coef)
+  
+})
+outcome_lm <-  data.frame(matrix(unlist(outcome_lm), ncol = 2, byrow = TRUE,
+                          dimnames = list(
+                     c(rownames(mvalueSet_F)), c("Estimate", "p.value"))))
+
+outcome_lm <- outcome_lm %>% mutate(CpGs = rownames(mvalueSet_F)) %>% dplyr::select(CpGs, everything())
+outcome_lm <- outcome_lm[order(outcome_lm$p.value, decreasing = F), ]
+
+outcome_lm1 <- outcome_lm[outcome_lm$p.value <= 0.00001, ] %>% 
+  mutate(methy_status = if_else(.$Estimate > 0, "hyper-methylated", "hypo-methylated")) %>% 
+  dplyr::select(CpGs, everything())
+
+kable(outcome_lm1, caption = "Top CpGs by Exposure Status, adjusting for cell types", align = "c")
+
+ ## compare 
+cpg_com <- dmp_Set_Ftop$CpGs[dmp_Set_Ftop$CpGs %in% outcome_lm1$CpGs]
 
 ```
 
 
+The meanPlot is the average DNA methylation across the cell-type discrimating probes within the mixed and sorted samples. The table above showed the CpGs with p values less than 0.00001. The results between the unadjusted and adjusted cell-type composition analysis differ a lot. Only one CpG `r cpg_com` was shared in both approaches. The whole linear regression has the M-values of CpGs as the outcome (which is bimodal, might apply log10 transformation), and exposure, cell types as covariates. The direction here was defined by the value of the beta estimates of the exposure status. Both the directions and scopes of exposure effects on CpGs M values change a lot. 
+
+The gender of child may also be included in the model. 
+
+# 2. ChIP-Seq
+• Download the data provided on Canvas (tup1 IP.txt, mock IP.txt, input IP.txt). These are three ChIP-Seq experiments in yeast from Park et al. 2013 PLoS One 8:12 e83506 (http://www.ncbi.nlm.nih.gov/pubmed/24349523). Tup1 is a transcriptional repressor and the mock and input are two different controls for comparison.
+
+## (a) By examining the GEO links and reference, what methods were used for sequencing, basecalling, mapping reads and dealing with non-uniquely mapped reads? What is the difference between mock and input controls?
+
+Sequencing was carried out by either Illumina HiSeq 2000 or SOLiD V4. Basecalls performed using CASAVA version 1.8. ChIP-seq reads were aligned to the sacCer3 genome assembly using BWA (Version: 0.5.9-r16) with default options. Non-uniquely mapped reads were filtered out in order to remove the reads with low mapping quality.  
+
+Mock ChIP DNA was prepared by immunoprecipitation with IgG Sepharose in the wild type strain with no TAP-tagged protein expression. Input DNA was prepared in parallel with the SWI6-TAP ChIP sample but leaving out the immunoprecipitation step. So the mock had the no-antibody ip step, but the input did not have the ip step.
+
+## (b) Using baseLineCalc(), what is the average number of sequenced mapped at each position? Does the Tup1 ChIP or mock sample have more average reads? (Hint: This function and the function in part c) only need the last column of read counts from allData$IPdata and allData$controlData)
+
+```{r base}
+data(yeastCDS) #for gene location annotation
+## also input_IP.txt
+allData <- dataReading("tup1_IP.txt", "mock_IP.txt", yeastSpecies = yeastCDS$Saccharomyces.cerevisiae) 
+#read in data
+
+## average test group
+mean_tup1 <- baseLineCalc(allData$IPdata[,3])
+
+## average control group
+mean_mock <- baseLineCalc(allData$controlData[,3])
+
+##
+mean_tup1 > mean_mock
+
+```
+
+The average number of sequenced mapped at each position for Tup1 ChIP is `r mean_tup1`, for mock control is `r mean_mock`. The Tup1 ChIP has more average reads. 
+
+## (c) Examining only chromosome V ("chrV"), by subsetting the first column of allData$IPdata and allData$controlData, run peakDetection(), with the baseLineIP and baseLineControl values calculated in part b).
+
+```{r peak}
+## chromosomes names
+chromNames <- unique(allData$IPdata[,1])
+chromNames[5]
+## mask
+filter <- stats::filter
+## 
+IPsignal <-  dataSmoothing(allData$IPdata[allData$IPdata[,1] == "chrV",3], 20)
+controlSignal <- dataSmoothing(allData$controlData[allData$controlData[,1] == "chrV",3], 20)
+# peak detection
+detectedPeaks <-  peakDetection(IPdata = IPsignal, controlData = controlSignal, chrName = as.character(chromNames[5]), windowSize = 150, windowOverlap = 50, outputName = paste("bPeaks_example_", chromNames[5], sep = ""), baseLineIP = mean_tup1, baseLineControl = mean_mock, IPthreshold = 6, controlThreshold = 4, ratioThreshold = 2, averageThreshold = 0.7, peakDrawing = TRUE)
+# print detected genomic positions
+print(detectedPeaks)
+
+# 
+nrow(detectedPeaks)
+
+## peak locations
+peakLocation(bedFile = "bPeaks_example_chrV.bed", cdsPositions = yeastCDS$Saccharomyces.cerevisiae, withoutOverlap = FALSE, outputName = "bPeaks_example_chrV", promSize = 800)
+
+## import the result
+promo <- read.delim("bPeaks_example_chrV_peakLocation_inPromoters.txt", header = F, sep = "\t")
+promos <- NULL
+for(i in 1:nrow(promo)){
+promos[i] <- unlist(strsplit(unlist(strsplit(promo[i,3], "|", fixed=TRUE))[3], "=", fixed = T))[2]
+}
+promos
+cds <- read.delim("bPeaks_example_chrV_peakLocation_inCDS.txt", header = F, sep = "\t")
+cdss <- NULL
+for(i in 1:nrow(cds)){
+cdss[i] <- unlist(strsplit(unlist(strsplit(cds[i,3], "|", fixed=TRUE))[3], "=", fixed = T))[2]
+}
+cdss
+
+```
+
+This method detected `r nrow(detectedPeaks)` peaks. This method using a sliding window to scan the genomic sequence. Four criterion are used to define the peak region, peak shape, and adjacent regions may be merged. Basically, to find the significant window first and then right peak shapes within the window. 
+
+These 4 parameters are used to define the interesting region. T1 = IPthreshold is a high number of reads in the IP sample. T2 = controlThreshold is a low number of reads in the control sample. "ratioThreshold" is a high value of log(IP/control) and "averageThreshold" is a good sequencing coverage for both IP and control samples.  
+
+"peak_datasummary" shows graphical representations of the detected basic peaks, together with the values of the parameters used to detect the region, and the number of windows and peaks.  
 
 
+"bPeaks-Drawing" 1st page showed the IP and control peak shape of peak #1 versus the location of this peak. Basically, by just plotting the 4 parameters of this peak against the location on the chromosome of this peak. 
+
+Find the attached pdf at the end of the document, "example" using the mock and "input" using the input as control. 
+
+## (d) The bPeaks package uses simple fold change cutoffs. What alternative methods discussed in class would you apply for a more rigorous approach to detect peaks using a statistical testing framework? Describe the methods and statistical approach.
 
 
+In the class, we discussed using empirical FDR or Irreproducible Discovery Rate (IDR). The IDR using the pairs of replicates, ranking the peaks by reproducibility, and giving each peak an index. At the end, overall expected rate of irreproducible discoveries (IDR) is calculated. 
 
+## (e) Using peakLocation() with the file provided in Canvas "bPeaks results.bed" and yeastCDS$Saccharomyces.cerevisiae for the cdsPositions. How many of the peaks are in genes or promoters? What are those genes?
+
+There are 15 peaks in promoters and 2 peaks in CDS (coding region of the gene). Promoters are `r promos`. And cds are `r cdss`. 
+
+## f) Now repeat b), c) and e) using the input IP sample instead ("input IP.txt"). What differences do you find between the results using mock or input IP? How does that relate to the conclusions in the paper (see Discussion)?
+
+```{r input}
+
+## also input_IP.txt
+allData <- dataReading("tup1_IP.txt", "input_IP.txt", yeastSpecies = yeastCDS$Saccharomyces.cerevisiae)
+
+## average test group
+mean_tup1 <- baseLineCalc(allData$IPdata[,3])
+
+## average control group
+mean_input<- baseLineCalc(allData$controlData[,3])
+##
+mean_tup1 > mean_input
+
+## chromosomes names
+chromNames <- unique(allData$IPdata[,1])
+chromNames[5]
+## mask
+filter <- stats::filter
+## 
+IPsignal <-  dataSmoothing(allData$IPdata[allData$IPdata[,1] == "chrV",3], 20)
+controlSignal <- dataSmoothing(allData$controlData[allData$controlData[,1] == "chrV",3], 20)
+
+# peak detection
+detectedPeaks <-  peakDetection(IPdata = IPsignal, controlData = controlSignal, chrName = as.character(chromNames[5]), windowSize = 150, windowOverlap = 50, outputName = paste("bPeaks_input_", chromNames[5], sep = ""), baseLineIP = mean_tup1, baseLineControl = mean_input, IPthreshold = 6, controlThreshold = 4, ratioThreshold = 2, averageThreshold = 0.7, peakDrawing = TRUE)
+# print detected genomic positions
+print(detectedPeaks)
+
+# 
+nrow(detectedPeaks)
+
+## peak locations
+peakLocation(bedFile = "bPeaks_input_chrV.bed", cdsPositions = yeastCDS$Saccharomyces.cerevisiae, withoutOverlap = FALSE, outputName = "bPeaks_input_chrV", promSize = 800)
+
+## import the result
+promo_in <- read.delim("bPeaks_input_chrV_peakLocation_inPromoters.txt", header = F, sep = "\t")
+promos_in <- NULL
+for(i in 1:nrow(promo_in)){
+promos_in[i] <- unlist(strsplit(unlist(strsplit(promo_in[i,3], "|", fixed=TRUE))[3], "=", fixed = T))[2]
+}
+promos_in
+cds_in <- read.delim("bPeaks_input_chrV_peakLocation_inCDS.txt", header = F, sep = "\t")
+cdss_in <- NULL
+for(i in 1:nrow(cds_in)){
+cdss_in[i] <- unlist(strsplit(unlist(strsplit(cds_in[i,3], "|", fixed=TRUE))[3], "=", fixed = T))[2]
+}
+cdss_in
+## difference 
+ sum(promos_in %in% promos == 0)
+
+```
+
+
+With input_IP as control, `r nrow(detectedPeaks)` peaks were detected. 18 peaks are in the promoter region and 2 peaks are in the CDS region. Promoters are `r promos_in`. And cds are `r cdss_in`. I found the genes of CDS were identical by these two approaches. And by using input DNA as the control, `r sum(promos_in %in% promos == 0)` more genes (promoter region) were detected, others were shared by these 2 different control approaches. 
+
+In the paper discussion, they found there was a background signal deriving from expression bias by input DNA control. Thus, the background signal of transcription factor binding cannot be canceled. By using the corresponding mock ChIP data as the control, one can minimize false positives.
+
+According to the discussion, the `r sum(promos_in %in% promos == 0)` more genes (promoter region) found by input DNA control might be false positive, might due to the expression bias. 
 
 
