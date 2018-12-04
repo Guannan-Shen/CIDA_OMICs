@@ -119,6 +119,7 @@ First, we need to do a first pass at the differential expression analysis in ord
 # pData is phenoData from Biobase
 countData <- counts(set) #Matrix with transcripts IDs as rows and sample IDs as columns
 colData <- pData(set) #Vector of type list in which the group column is the treat/control identfier, and the rownames are sample IDs
+
 #Run DESeq function using above objects
 head(counts(set))
 head(pData(set))
