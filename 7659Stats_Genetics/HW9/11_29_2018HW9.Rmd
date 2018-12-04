@@ -40,7 +40,7 @@ opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/")
 
 ```{r libs}
 ## set up workspace
-
+library(class)
 library(knitr)
 library(tidyverse)
 library(magrittr)
@@ -59,9 +59,54 @@ getwd()
 
 ```
 
+# Classification
+• Download the data provided on Canvas (dataHW9-breastcancer.Rdata). This file contains the "breastcancer" object, which is a dataset for 46 breast tumor samples where 23 are positive for an estrogen receptor (ER+) and 23 were negative (ER-) (West et al., PNAS 2001 98:11462-11467). There are expression levels for 7129 genes for each sample in this list (x) and class labels for each sample (y).  
+  
+• Install the class package from CRAN
 
+## (a) Describe the k-nearest neighbor algorithm and how it classifies observations. Using the function knn() from the class package, run k-nearest neighbors with k = 3 to train and test on the same training data set (train). What percentage of subjects were correctly classified? It is not good practice to train and test on the same data set, why not?
 
+The KNN here is a non-parametric method used for classification. The output is a class label. An object is classified by a majority vote of its k nearest neighbors, and the classes of neighbors are known. Thus, this is a type of supervised learning.  
 
+This method using training examples with features and class labels. When a test point (have features but does not have a class label) is provided, the distance metric (such as Euclidean distance, correlation coefficients) is calculated to define its k nearest neighbors. Eventually, the test point is assigned to the majority labels of its neighbors. 
 
+```{r knn}
+load("dataHW9_breastcancer.Rdata")
+## import train test data
+train <-  breastcancer[[1]] #training expression data
+trainclass <-  breastcancer[[2]] #training classes
+test <-  newpatients #new expression data
+testclass <-  trueclasses #new classes
 
+## run knn()
+k1 <- knn(t(train),t(train), trainclass, k = 3)
+k1_err <- sum(!(k1 == trainclass))/length(k1)
+k1_err
+
+## k selection
+# k is usually small
+set.seed(123)
+k_err <- NULL
+k_range <- 1:20
+for(i in k_range){
+  knn = knn(t(train),t(train), trainclass, k = i)
+  k_err[i] <- sum(!(knn == trainclass))/length(knn)
+}
+k_err
+
+## double check
+sum(!(knn(t(train),t(train), trainclass, k = 1) == trainclass))
+
+## plot 
+plot(k_range, k_err, type = "o")
+
+```
+
+In this case, `r (1 - k1_err)`% of subjects were correctly classified.  
+
+If we train and test on the same data set, the result always looks too good, thus we can not test how well the model actually is. And we would never know if this model is generalizable or not. 
+
+## (b) Repeat part a) but for multiple values of k. What values and range of k are suitable for k-nearest neighbor? Plot k versus error rate. What value of k would you select based on this plot and why?
+
+The k is usually a small number, but larger values of k reduces effect of the noise on the classification. Also, in binary (two class) classification problems, it is helpful to choose k to be an odd number as this avoids tied votes. In this case, I
 
