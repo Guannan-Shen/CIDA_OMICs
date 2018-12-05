@@ -29,9 +29,9 @@ knitr::opts_chunk$set(warning = F)
 ## setting wd in DELL
 ## opts_knit$set(root.dir = "~/Stats/CIDA_OMICs/CIDA_OMICS/7659Stats_Genetics/HW5/")
 ## setting working directory in asus 
-opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/") 
+## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/") 
 ## setting working directory in ubuntu
-## opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/")
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -101,9 +101,9 @@ plot(k_range, k_err, type = "o")
 
 ### test with new data
 k_err_test <- NULL
-for(i in c(1,10)){
+for(i in c(1,6, 10)){
   knn = knn(t(train),t(test), trainclass, k = i)
-  k_err_test[which(c(1,10) %in% i)] <- sum(!(knn == testclass))/length(knn)
+  k_err_test[which(c(1,6, 10) %in% i)] <- sum(!(knn == testclass))/length(knn)
 }
 k_err_test
 
@@ -116,21 +116,86 @@ If we train and test on the same data set, the result always looks too good, thu
 
 ## (b) Repeat part a) but for multiple values of k. What values and range of k are suitable for k-nearest neighbor? Plot k versus error rate. What value of k would you select based on this plot and why?
 
-The k is usually a small number, but larger values of k reduces effect of the noise on the classification. Also, in binary (two class) classification problems, it is helpful to choose k to be an odd number as this avoids tied votes. Since I don't fully trust the train and test with the same dataset approach. In this case, based on the above plot, I would choose k = 1 or k = 10 instead of one k. 
+The k is usually a small number, but larger values of k reduces effect of the noise on the classification. Also, in binary (two class) classification problems, it is helpful to choose k to be an odd number as this avoids tied votes. Since I don't fully trust the train and test with the same dataset approach. In this case, based on the above plot, I would choose k = 10. Because using k = 1 in this approach will always have a 0 error rate as the data point are classified based on itself. 
 
 ## (c) Using k selected in part b), predict the tumor class for three new subjects in newpatients using their k nearest-neighbors in the training data. The correct classes are in trueclasses. How well did you do?
 
-In my case, k=1 has an error rate `r k_err_test[1]` and k=10 has an error rate `r k_err_test[2]`. 
+In my case, k=10 has an error rate `r k_err_test[3]`. 
 
 ```{r moreknn}
 ## 5 fold cross validation
+set.seed(123)
+k_err <- NULL
+k_err_fold <- NULL
+k_range <- 1:20
+for(k in k_range){
+  for(j in 1:5){
+    if(j <=4 ){
+  knn = knn(t(train)[-(((j-1)*10 + 1):(10*j)), ], t(train)[((j-1)*10 + 1):(10*j) ,], 
+            trainclass[-(((j-1)*10 + 1):(10*j))], k = k)
+   k_err_fold[j] <-  sum(!(knn == trainclass[((j-1)*10 + 1):(10*j)] ))/length(knn)
+    }else{
+      knn = knn(t(train)[1:36, ], t(train)[37:46, ], 
+            trainclass[1:36], k = k)
+   k_err_fold[j] <-  sum(!(knn == trainclass[37:46] ))/length(knn)
+    }
+  }
+  k_err[k] <- mean(k_err_fold)
+}
 
 
+## plot 
+plot(k_range, k_err, type = "o",ylab="misclassification error")
 
+## true test
+## see above 
 
 ```
 
 ## (d) Extra credit: Perform 5-fold cross validation to determine your error rate on the training data (perform on only one random partitioning). Since 46/5 is not an integer, make sure that the test group is the one with 10 patient samples. Plot your results for different values of k. How does this compare to the error rates from part a) above.
+
+With 5-fold cross validation by taking the mean error rates of 5 folds, the k = 6 was my choice. In this case, the overall error rates were higher compared with previous approach, because we used a pseudo test dataset. Once the scenario was more like the real training and testing situation, we were able to find more reliable value of the tuning parameter k.  
+
+## (e) Extra Credit: Write your own code for k-nearest neighbor classification using one minus the absolute correlation as a distance. Apply your code to the samples and plot the error rate for different values of k. What value for k do you select based on the training data? How does that compare with the results using the Euclidean distance from part a) and b).
+
+```{r knncorrelation}
+knn_corr <- function(train, test, label, k){
+  train = as.matrix(train); test = as.matrix(test) ; k = as.integer(k)
+  ntrain = nrow(train) ; ntest = nrow(test)
+if(ntrain == length(label)){
+  disCorr = matrix(NA, nrow = ntrain, ncol = ntest) 
+  for(i in 1:ntest){
+    for(j in 1:ntrain){
+      disCorr[j,i] = 1 - cor(train[j, ], test[i, ],  method = "pearson")
+    }
+  }
+  disCorr = as.data.frame(disCorr)
+  disCorr[,(ntest + 1)] = label
+  knnlabel = NULL
+  for(i in 1:ntest){
+    topk = disCorr[order(disCorr[,i],  decreasing = F)[1:k] , c(i,(ntest + 1))]
+    knnlabel[i] = names(which.max(table(topk[,2])))
+  }
+  knnlabel
+}else{return("Check the length of label!") }
+  
+}
+
+## test new knn
+set.seed(123)
+k_err <- NULL
+k_range <- 1:20
+for(i in k_range){
+  knn = knn_corr(t(train),t(train), trainclass, k = i)
+  k_err[i] <- sum(!(knn == trainclass))/length(knn)
+}
+
+## plot 
+plot(k_range, k_err, type = "o",ylab="misclassification error")
+```
+
+
+Using one minus the absolute correlation as the distance and the same approach in (a) and (b), k = 2 seems to be a reasonable choice and the results were quite different from the previous method. 
 
 
 # Clustering
@@ -179,18 +244,53 @@ ggplot(data=k_sall, aes(x=X1, y=X3, fill=X2)) +
   geom_bar(stat="identity") +
   labs(fill = "Clusters") +
   labs(x = "Number of Clusters") +
-  labs(y = "Within Sum of Squares")
+  labs(y = "Within Sum of Squares") +
+  theme_linedraw()
 
 ## choice of 4
 km4 <- kmeans(t(syeast), 4, iter.max = 10)
+km4$withinss
 km4$cluster
   
 ############### hierarchical clustering ############
-hclust()
+## get distance matrix
+m <- as.matrix(dist(t(syeast), method = "euclidean"))
+d <- as.dist(m)
+# hierarchical clustering
+par(mfrow = c(1,2))
+plclust(hclust(d, "single"), xlab = "Yeast",main = "Cluster Dendrogram")
+plclust(hclust(d, "complete"), xlab = "Yeast",main = "Cluster Dendrogram")
+plclust(hclust(d, "average"), xlab = "Yeast",main = "Cluster Dendrogram")
+plclust(hclust(d, "centroid"), xlab = "Yeast",main = "Cluster Dendrogram")
+
+## manhattan distance
+m <- as.matrix(dist(t(syeast), method = "manhattan"))
+d <- as.dist(m)
+# hierarchical clustering
+plclust(hclust(d, "single"), xlab = "Yeast",main = "Cluster Dendrogram")
+plclust(hclust(d, "complete"), xlab = "Yeast",main = "Cluster Dendrogram")
+plclust(hclust(d, "average"), xlab = "Yeast",main = "Cluster Dendrogram")
+plclust(hclust(d, "centroid"), xlab = "Yeast",main = "Cluster Dendrogram")
 
 ```
 
+## (a) Using the R code in section 11.5.1 as an example, run the k-means algorithm to cluster the data (use the standardized data - see Step 2). Try different values for k = 2, 3 ... and create a plot of "Within Sum of Squares" versus k. What is your best choice of k? For the final clusters, what genes are grouped together?
 
+Based on above plots on sum of "Within Sum of Squares" and stacking barplot of "Within Sum of Squares", k = 4 is my best choice of k. In this 4-cluster clustering, I got 4 MCMs in the 4th cluster, HSP78 and HSP104 in the 3rd cluster, RPS26B and RPS26A in the 2nd cluster and RPS8A, RPS31A and HSP60 in the 1st cluster. 
+
+## (b) Using the R code in section 10.4 as an example, apply the hierarchical clustering algorithm on the data. Calculate the Euclidean distance (using dist() then as.dist()) with standardized data. How does the cluster membership obtained with hierarchical clustering compare with the results from k-means in part a)? Describe the "method" option in hclust discussed in class. Try different values for "method". What happens when you change this option? Repeat this analysis with the Manhattan (L1) distance instead. How do the results change?
+
+By using the example method of hierarchical clustering, "single", this result was very similar with the grouping obtained by k=4, kmeans method. In detail, all 4 MCMs were grouped together, HSP78 and HSP104 were in a cluster, RPS26B and RPS26A were in another one, and RPS31A and RPS8A were in one cluster. The difference here is HSP60 was in its own cluster. However, similar to the kmeans clustering, this one was close to the cluster of RPS31A and RPS8A, not the cluster of HSPs. 
+
+In the class, we talked about 4 methods to compare two clusters.  
+1. Single linkage using minimum distance between points in different clusters.  
+2. Complete linkage using maximum distance.  
+3. Mean linkage using average of all distances.  
+4. Centroids using distance between within-cluster means.  
+
+Through different methods, the key difference was how was the unique one, HSP60 clustered. Other clusters were very robust. Overall, the "complete" method had the best clustering based on the labels, where the HSP60 was grouped into the HSP cluster. 
+
+In summary, the manhattan (L1) distance out-performed the euclidean distance methods. Most hierarchical clustering methods based on the manhattan distance can correctly group HSP60 into the HSP cluster. 
 
 
 
