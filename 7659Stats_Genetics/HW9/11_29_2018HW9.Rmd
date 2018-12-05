@@ -258,19 +258,19 @@ m <- as.matrix(dist(t(syeast), method = "euclidean"))
 d <- as.dist(m)
 # hierarchical clustering
 par(mfrow = c(1,2))
-plclust(hclust(d, "single"), xlab = "Yeast",main = "Cluster Dendrogram")
-plclust(hclust(d, "complete"), xlab = "Yeast",main = "Cluster Dendrogram")
-plclust(hclust(d, "average"), xlab = "Yeast",main = "Cluster Dendrogram")
-plclust(hclust(d, "centroid"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "single"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "complete"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "average"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "centroid"), xlab = "Yeast",main = "Cluster Dendrogram")
 
 ## manhattan distance
 m <- as.matrix(dist(t(syeast), method = "manhattan"))
 d <- as.dist(m)
 # hierarchical clustering
-plclust(hclust(d, "single"), xlab = "Yeast",main = "Cluster Dendrogram")
-plclust(hclust(d, "complete"), xlab = "Yeast",main = "Cluster Dendrogram")
-plclust(hclust(d, "average"), xlab = "Yeast",main = "Cluster Dendrogram")
-plclust(hclust(d, "centroid"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "single"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "complete"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "average"), xlab = "Yeast",main = "Cluster Dendrogram")
+plot(hclust(d, "centroid"), xlab = "Yeast",main = "Cluster Dendrogram")
 
 ```
 
