@@ -12,6 +12,7 @@ Sample GSM3374614: ***Resampled* single cell RNA-seq library** from the 10x geno
 
 ### Seurat - Guided Clustering Tutorial
 https://satijalab.org/seurat/pbmc3k_tutorial.html
+https://satijalab.org/seurat/immune_alignment.html
 
 
 ## Reference and Data Resource
