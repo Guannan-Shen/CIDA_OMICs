@@ -31,7 +31,8 @@ knitr::opts_chunk$set(warning = F)
 ## setting working directory in asus 
 ## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/") 
 ## setting working directory in ubuntu
-opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/Proj_Single_Cell/DataRaw/")
+
+# opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/Proj_Single_Cell/DataRaw/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -67,26 +68,46 @@ getwd()
 
 ```{r setup}
 # Sample GSM3374613: **Original single cell RNA-seq library** from the 10x genomics 3' end library prep. PBMCs were isolated from a health human donor. 
-ctrl.data <- read.table("~/Documents/Stats/7659Genetics/Proj/GSM3374611_original_10x_umis.tsv.gz", sep = "\t", header = T)
+
+## C:\Users\hithr\Documents\Stats\7659Genetics\Proj
+ctrl.data <- read.table("C:/Users/hithr/Documents/Stats/7659Genetics/Proj/GSM3374613_kirkpatrick_umis.tsv.gz", sep = "\t", header = T) #, sep = "\t", header = T)
+barcodes.ctrl <- colnames(ctrl.data)
+genes.ctrl <- ctrl.data[,1]
+## write.table(test, file='test.tsv', quote=FALSE, sep='\t', col.names = NA)
+# ctrl.data <- read.table("~/Documents/Stats/7659Genetics/Proj/GSM3374613_kirkpatrick_umis.tsv.gz", sep = "\t", header = T)
+
 dim(ctrl.data)
 head(ctrl.data[, 1:6])
+## get the pure counts
+ctrl <- ctrl.data
+colnames(ctrl) <- NULL
+ctrl <- ctrl[, -1]
+rownames(ctrl) <- NULL
+ctrl <- as.matrix(ctrl)
+head(ctrl[, 1:6])
 ## check the sparsity
-genelevelSparse_ctrl <-  apply(ctrl.data, 1, function(x){
-  sum(x == 0)/length(x)
+genelevelSparse_ctrl <-  apply(ctrl, 1, function(x){
+  sum(x != 0)/length(x)
 })
 sum(genelevelSparse_ctrl != 0)
+hist(genelevelSparse_ctrl, freq = T)
+
 ## boxplot(log2(ctrl.data), main = "The Counts of Single Cell RNA-Seq", ylab= "log2(Counts)")
 # Sample GSM3374614 PBMCs were isolated from a health human donor and a LNA probe was used to hybridize selected cells for targeted resequencing.
 stim.data <- as.data.frame(as.matrix(fread("~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/Proj_Single_Cell/DataRaw/GSM3374614_mkcell_pulldown_umis.tsv")))
 dim(stim.data)
 genelevelSparse_stim <-apply(stim.data, 1, function(x){
-  sum(x == 0)/length(x)
+  sum(x != 0)/length(x)
 }) 
 sum(genelevelSparse_stim != 0)
+
 # Initialize the Seurat object with the raw (non-normalized data).  Keep all
 # genes expressed in >= 3 cells (~0.1% of the data). Keep all cells with at
 # least 200 detected genes
-pbmc <- CreateSeuratObject(raw.data = ctrl.data, min.cells = 3, min.genes = 200, 
+colnames(ctrl) <- as.vector(barcodes.ctrl[-1])
+rownames(ctrl) <- genes.ctrl
+head(ctrl[, 1:6])
+pbmc <- CreateSeuratObject(raw.data = ctrl, min.cells = 3, min.genes = 200, 
     project = "10X_PBMC")
 
 ```
