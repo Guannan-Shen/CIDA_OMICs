@@ -1,5 +1,5 @@
 ---
-title: "Single Cell RNA-Seq"
+title: "Single Cell RNA-Seq (scRNA-seq)"
 author: "Guannan Shen"
 date: "December 11, 2018"
 output: 
@@ -32,7 +32,7 @@ knitr::opts_chunk$set(warning = F)
 ## opts_knit$set(root.dir = "C:/Users/hithr/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/HW9/") 
 ## setting working directory in ubuntu
 
-# opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/Proj_Single_Cell/DataRaw/")
+opts_knit$set(root.dir = "~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/Proj_Single_Cell/DataRaw/")
                                                  
 ## cache = F, if cache = T, will not revaluate code chunk everytime
 ## double or more space to insert a line break
@@ -66,16 +66,16 @@ getwd()
 # Setup the Seurat Object
 
 
-```{r setup}
+```{r setupforraw}
 # Sample GSM3374613: **Original single cell RNA-seq library** from the 10x genomics 3' end library prep. PBMCs were isolated from a health human donor. 
 
 ## C:\Users\hithr\Documents\Stats\7659Genetics\Proj
-ctrl.data <- read.table("C:/Users/hithr/Documents/Stats/7659Genetics/Proj/GSM3374613_kirkpatrick_umis.tsv.gz", sep = "\t", header = T) #, sep = "\t", header = T)
+
+## write.table(test, file='test.tsv', quote=FALSE, sep='\t', col.names = NA)
+ctrl.data <- read.table("~/Documents/Stats/7659Genetics/Proj/GSM3374613_kirkpatrick_umis.tsv.gz", sep = "\t", header = T)
+### ctrl.data <- read.table("C:/Users/hithr/Documents/Stats/7659Genetics/Proj/GSM3374613_kirkpatrick_umis.tsv.gz", sep = "\t", header = T) #, sep = "\t", header = T)
 barcodes.ctrl <- colnames(ctrl.data)
 genes.ctrl <- ctrl.data[,1]
-## write.table(test, file='test.tsv', quote=FALSE, sep='\t', col.names = NA)
-# ctrl.data <- read.table("~/Documents/Stats/7659Genetics/Proj/GSM3374613_kirkpatrick_umis.tsv.gz", sep = "\t", header = T)
-
 dim(ctrl.data)
 head(ctrl.data[, 1:6])
 ## get the pure counts
@@ -90,16 +90,44 @@ genelevelSparse_ctrl <-  apply(ctrl, 1, function(x){
   sum(x != 0)/length(x)
 })
 sum(genelevelSparse_ctrl != 0)
-hist(genelevelSparse_ctrl, freq = T)
+hist(genelevelSparse_ctrl, freq = T, breaks = 50)
 
 ## boxplot(log2(ctrl.data), main = "The Counts of Single Cell RNA-Seq", ylab= "log2(Counts)")
 # Sample GSM3374614 PBMCs were isolated from a health human donor and a LNA probe was used to hybridize selected cells for targeted resequencing.
-stim.data <- as.data.frame(as.matrix(fread("~/Documents/Stats/CIDA_OMICs/7659Stats_Genetics/Proj_Single_Cell/DataRaw/GSM3374614_mkcell_pulldown_umis.tsv")))
+stim.data <- read.table("~/Documents/Stats/7659Genetics/Proj/GSM3374614_mkcell_pulldown_umis.tsv.gz", sep = "\t", header = T)
 dim(stim.data)
-genelevelSparse_stim <-apply(stim.data, 1, function(x){
+
+barcodes.stim <- colnames(stim.data)
+genes.stim <- stim.data[,1]
+dim(stim.data)
+head(stim.data[, 1:6])
+
+##  test PF4 megakaryocyte
+"PF4" %in% genes.stim
+"PF4" %in% genes.ctrl
+
+"CD8" %in% genes.stim
+"CD8" %in% genes.ctrl
+
+pf4.ctrl <- as.numeric(ctrl.data[ctrl.data$gene == "PF4", -1])
+pf4.stim <- as.numeric(stim.data[stim.data$gene == "PF4", -1])
+hist(pf4.ctrl, breaks = 50)
+hist(pf4.stim, breaks = 50)
+
+
+## get the pure counts
+stim <- stim.data
+colnames(stim) <- NULL
+stim <- stim[, -1]
+rownames(stim) <- NULL
+stim <- as.matrix(stim)
+head(stim[, 1:6])
+
+genelevelSparse_stim <-apply(stim, 1, function(x){
   sum(x != 0)/length(x)
 }) 
 sum(genelevelSparse_stim != 0)
+hist(genelevelSparse_stim, freq = T, breaks = 50)
 
 # Initialize the Seurat object with the raw (non-normalized data).  Keep all
 # genes expressed in >= 3 cells (~0.1% of the data). Keep all cells with at
@@ -110,11 +138,314 @@ head(ctrl[, 1:6])
 pbmc <- CreateSeuratObject(raw.data = ctrl, min.cells = 3, min.genes = 200, 
     project = "10X_PBMC")
 
+slotNames(pbmc)
+
+
+
+
+```
+
+```{r qcraw}
+# The number of genes and UMIs (nGene and nUMI) are automatically calculated
+# for every object by Seurat.  For non-UMI data, nUMI represents the sum of
+# the non-normalized values within a cell We calculate the percentage of
+# mitochondrial genes here and store it in percent.mito using AddMetaData.
+# We use object@raw.data since this represents non-transformed and
+# non-log-normalized counts The % of UMI mapping to MT-genes is a common
+# scRNA-seq QC metric.
+mito.genes <- grep(pattern = "^MT-", x = rownames(x = pbmc@data), value = TRUE)
+percent.mito <- Matrix::colSums(pbmc@raw.data[mito.genes, ])/Matrix::colSums(pbmc@raw.data)
+
+# AddMetaData adds columns to object@meta.data, and is a great place to
+# stash QC stats
+pbmc <- AddMetaData(object = pbmc, metadata = percent.mito, col.name = "percent.mito")
+VlnPlot(object = pbmc, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
+# GenePlot is typically used to visualize gene-gene relationships, but can
+# be used for anything calculated by the object, i.e. columns in
+# object@meta.data, PC scores etc.  Since there is a rare subset of cells
+# with an outlier level of high mitochondrial percentage and also low UMI
+# content, we filter these as well
+par(mfrow = c(1, 2))
+GenePlot(object = pbmc, gene1 = "nUMI", gene2 = "percent.mito")
+GenePlot(object = pbmc, gene1 = "nUMI", gene2 = "nGene")
+# We filter out cells that have unique gene counts over 2,500 or less than
+# 200 Note that low.thresholds and high.thresholds are used to define a
+# 'gate'.  -Inf and Inf should be used if you don't want a lower or upper
+# threshold.
+pbmc <- FilterCells(object = pbmc, subset.names = c("nGene", "percent.mito"), 
+    low.thresholds = c(200, -Inf), high.thresholds = c(2500, 0.05))
+
+# After removing unwanted cells from the dataset, the next step is to normalize the data. By default, we employ a global-scaling normalization method “LogNormalize” that normalizes the gene expression measurements for each cell by the total expression, multiplies this by a scale factor (10,000 by default), and log-transforms the result.
+
+pbmc <- NormalizeData(object = pbmc, normalization.method = "LogNormalize", 
+    scale.factor = 10000)
+
+```
+
+## Detection of variable genes across the single cells
+Seurat calculates highly variable genes and focuses on these for downstream analysis. FindVariableGenes calculates the average expression and dispersion for each gene, places these genes into bins, and then calculates a z-score for dispersion within each bin. This helps control for the relationship between variability and average expression. This function is unchanged from (Macosko et al.), but new methods for variable gene expression identification are coming soon. We suggest that users set these parameters to mark visual outliers on the dispersion plot, but the exact parameter settings may vary based on the data type, heterogeneity in the sample, and normalization strategy. The parameters here identify ~2,000 variable genes, and represent typical parameter settings for UMI data that is normalized to a total of 1e4 molecules.
+
+## Scaling the data and removing unwanted sources of variation
+
+Your single cell dataset likely contains ‘uninteresting’ sources of variation. This could include not only technical noise, but batch effects, or even biological sources of variation (cell cycle stage). As suggested in Buettner et al, NBT, 2015, regressing these signals out of the analysis can improve downstream dimensionality reduction and clustering. To mitigate the effect of these signals, Seurat constructs linear models to predict gene expression based on user-defined variables. The scaled z-scored residuals of these models are stored in the scale.data slot, and are used for dimensionality reduction and clustering.
+
+
+We can regress out cell-cell variation in gene expression driven by batch (if applicable), cell alignment rate (as provided by Drop-seq tools for Drop-seq data), the number of detected molecules, and mitochondrial gene expression. For cycling cells, we can also learn a ‘cell-cycle’ score (see example here) and regress this out as well. In this simple example here for post-mitotic blood cells, we regress on the number of detected molecules per cell as well as the percentage mitochondrial gene content.
+
+
+Seurat v2.0 implements this regression as part of the data scaling process. Therefore, the RegressOut function has been deprecated, and replaced with the vars.to.regress argument in ScaleData.
+
+
+## PC selection – 
+
+identifying the true dimensionality of a dataset – is an important step for Seurat, but can be challenging/uncertain for the user. We therefore suggest these three approaches to consider. The first is more supervised, exploring PCs to determine relevant sources of heterogeneity, and could be used in conjunction with GSEA for example. The second implements a statistical test based on a random null model, but is time-consuming for large datasets, and may not return a clear PC cutoff. The third is a heuristic that is commonly used, and can be calculated instantly. In this example, all three approaches yielded similar results, but we might have been justified in choosing anything between PC 7-10 as a cutoff. We followed the jackStraw here, admittedly buoyed by seeing the PCHeatmap returning interpretable signals (including canonical dendritic cell markers) throughout these PCs. Though the results are only subtly affected by small shifts in this cutoff (you can test below), we strongly suggest always explore the PCs they choose to include downstream.
+
+## Run Non-linear dimensional reduction (tSNE)
+
+Seurat continues to use tSNE as a powerful tool to visualize and explore these datasets. While we no longer advise clustering directly on tSNE components, cells within the graph-based clusters determined above should co-localize on the tSNE plot. This is because the tSNE aims to place cells with similar local neighborhoods in high-dimensional space together in low-dimensional space. As input to the tSNE, we suggest using the same PCs as input to the clustering analysis, although computing the tSNE based on scaled gene expression is also supported using the genes.use argument.
+
+## Finding differentially expressed genes (cluster biomarkers)
+
+Seurat can help you find markers that define clusters via differential expression. By default, it identifes positive and negative markers of a single cluster (specified in ident.1), compared to all other cells. FindAllMarkers automates this process for all clusters, but you can also test groups of clusters vs. each other, or against all cells.
+
+
+The min.pct argument requires a gene to be detected at a minimum percentage in either of the two groups of cells, and the thresh.test argument requires a gene to be differentially expressed (on average) by some amount between the two groups. You can set both of these to 0, but with a dramatic increase in time - since this will test a large number of genes that are unlikely to be highly discriminatory. As another option to speed up these computations, max.cells.per.ident can be set. This will downsample each identity class to have no more cells than whatever this is set to. While there is generally going to be a loss in power, the speed increases can be significiant and the most highly differentially expressed genes will likely still rise to the top. 
+
+
+```{r rawvarygenes}
+pbmc <- FindVariableGenes(object = pbmc, mean.function = ExpMean, dispersion.function = LogVMR, 
+    x.low.cutoff = 0.0125, x.high.cutoff = 4, y.cutoff = 0.5)
+length(x = pbmc@var.genes)
+pbmc <- ScaleData(object = pbmc, vars.to.regress = c("nUMI", "percent.mito"))
+pbmc <- FindVariableGenes(object = pbmc, mean.function = ExpMean, dispersion.function = LogVMR, 
+    x.low.cutoff = 0.0125, x.high.cutoff = 4, y.cutoff = 0.5)
+length(x = pbmc@var.genes)
+paste("nUMI, percent.mito, these variables won't change the expression spectrum")
+
+# Perform linear dimensional reduction
+## Next we perform PCA on the scaled data. By default, the genes in object@var.genes are used as input, but can be defined using pc.genes. We have typically found that running dimensionality reduction on highly variable genes can improve performance. However, with UMI data - particularly after regressing out technical variables, we often see that PCA returns similar (albeit slower) results when run on much larger subsets of genes, including the whole transcriptome.
+
+pbmc <- RunPCA(object = pbmc, pc.genes = pbmc@var.genes, do.print = TRUE, pcs.print = 1:10, 
+    genes.print = 5)
+PCAPlot(object = pbmc, dim.1 = 1, dim.2 = 2)
+VizPCA(object = pbmc, pcs.use = 1:4)
+VizPCA(object = pbmc, pcs.use = 5:8)
+VizPCA(object = pbmc, pcs.use = 8:12)
+# ProjectPCA scores each gene in the dataset (including genes not included
+# in the PCA) based on their correlation with the calculated components.
+# Though we don't use this further here, it can be used to identify markers
+# that are strongly correlated with cellular heterogeneity, but may not have
+# passed through variable gene selection.  The results of the projected PCA
+# can be explored by setting use.full=T in the functions above
+pbmc <- ProjectPCA(object = pbmc, do.print = FALSE)
+
+# NOTE: This process can take a long time for big datasets, comment out for
+# expediency.  More approximate techniques such as those implemented in
+# PCElbowPlot() can be used to reduce computation time
+pbmc <- JackStraw(object = pbmc, num.replicate = 100, display.progress = FALSE)
+JackStrawPlot(object = pbmc, PCs = 1:15)
+PCElbowPlot(object = pbmc)
+
+# save.SNN = T saves the SNN so that the clustering algorithm can be rerun
+# using the same graph but with a different resolution value (see docs for
+# full details)
+par(mfrow = c(2,2))
+for(i in 7:11){
+  for(j in c(0.6, 0.8, 0.9, 1.0)){
+pbmc <- FindClusters(object = pbmc, reduction.type = "pca", dims.use = 1:i, 
+    resolution = j, print.output = 0, save.SNN = TRUE)
+barplot(table(pbmc@ident), xlab = "Clusters", ylab = "Cell Counts")
+text(8, 280, labels = paste("Dimensions: ", i,sep = ""))
+text(8, 180, labels = paste(sep = "", "Resolution: ", j))
+  }
+}
+
+paste("Dimension: 9, resolution 0.9 was chosen before t-SNE")
+
+## rerun to choose clusters setting
+pbmc <- FindClusters(object = pbmc, reduction.type = "pca", dims.use = 1:9, 
+    resolution = 0.9, print.output = 0, save.SNN = TRUE)
+barplot(table(pbmc@ident), xlab = "Clusters", ylab = "Cell Counts")
+pbmc <- RunTSNE(object = pbmc, dims.use = 1:9, do.fast = TRUE)
+
+# note that you can set do.label=T to help label individual clusters
+plot1 <- TSNEPlot(object = pbmc, do.label=T)
+
+## You can save the object at this point so that it can easily be loaded back in without having to rerun the computationally intensive steps performed above, or easily shared with collaborators.
+
+saveRDS(pbmc, file = "~/Documents/Stats/7659Genetics/Proj/pbmc_GSM3374613.rds")
+
+# find all markers of cluster 1
+for(i in 0:8){
+cluster1.markers <- FindMarkers(object = pbmc, ident.1 = i, min.pct = 0.25)
+print(x = head(x = cluster1.markers, n = 5))
+if("PF4" %in% rownames(cluster1.markers)){
+  print(which(rownames(cluster1.markers %in% "PF4" )))
+}else{print("No")}
+}
+
+# you can plot raw UMI counts as well
+VlnPlot(object = pbmc, features.plot = c("PF4","PPBP"), use.raw = TRUE, y.log = TRUE)
+
+FeaturePlot(object = pbmc, features.plot = c("IL7R", "CD14", "LYZ","CD8A"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+FeaturePlot(object = pbmc, features.plot = c("MS4A1", "FCGR3A", "MS4A7"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+FeaturePlot(object = pbmc, features.plot = c("GNLY", "NKG7", "FCER1A", "CST3"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+
+FeaturePlot(object = pbmc, features.plot = c("PF4", "PPBP"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+
+
+current.cluster.ids <- c(0, 1, 2, 3, 4, 5, 6, 7, 8)
+new.cluster.ids <- c("CCL5", "CD4+ T-cells", "CD14+ Monocytes-a", "NK Cells", 
+    "RPL34", "Dendritic cells", "B Cells", "FCGR3A+ Monocytes", "LILRA4")
+pbmc@ident <- plyr::mapvalues(x = pbmc@ident, from = current.cluster.ids, to = new.cluster.ids)
+plot2 <- TSNEPlot(object = pbmc, do.label = TRUE, pt.size = 0.5)
+
+## save name 
+# First lets stash our identities for later
+pbmc <- StashIdent(object = pbmc, save.name = "ClusterNames_0.9_9")
+
+plot_grid(plot1, plot2)
+saveRDS(pbmc, file = "~/Documents/Stats/7659Genetics/Proj/pbmc_GSM3374613_final.rds")
+
 ```
 
 
+## resample 
+
+We found that megakaryocytes represented 2.2% of the PBMCs as judged by expression of the megakaryocyte marker PF4 
+
+```{r setupresample}
+
+colnames(stim) <- as.vector(barcodes.stim[-1])
+rownames(stim) <- genes.stim
+head(stim[, 1:6])
+pbmc <- CreateSeuratObject(raw.data = stim, min.cells = 2, min.genes = 100, 
+    project = "10X_PBMC")
+
+```
+
+```{r qcresample}
+# scRNA-seq QC metric.
+mito.genes <- grep(pattern = "^MT-", x = rownames(x = pbmc@data), value = TRUE)
+percent.mito <- Matrix::colSums(pbmc@raw.data[mito.genes, ])/Matrix::colSums(pbmc@raw.data)
+
+# AddMetaData adds columns to object@meta.data, and is a great place to
+# stash QC stats
+pbmc <- AddMetaData(object = pbmc, metadata = percent.mito, col.name = "percent.mito")
+VlnPlot(object = pbmc, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
+# GenePlot is typically used to visualize gene-gene relationships, but can
+# be used for anything calculated by the object, i.e. columns in
+# object@meta.data, PC scores etc.  Since there is a rare subset of cells
+# with an outlier level of high mitochondrial percentage and also low UMI
+# content, we filter these as well
+par(mfrow = c(1, 2))
+GenePlot(object = pbmc, gene1 = "nUMI", gene2 = "percent.mito")
+GenePlot(object = pbmc, gene1 = "nUMI", gene2 = "nGene")
+# We filter out cells that have unique gene counts over 2,500 or less than
+# 200 Note that low.thresholds and high.thresholds are used to define a
+# 'gate'.  -Inf and Inf should be used if you don't want a lower or upper
+# threshold.
+pbmc <- FilterCells(object = pbmc, subset.names = c("nGene", "percent.mito"), 
+    low.thresholds = c(100, -Inf), high.thresholds = c(5500, 0.05))
+
+# After removing unwanted cells from the dataset, the next step is to normalize the data. By default, we employ a global-scaling normalization method “LogNormalize” that normalizes the gene expression measurements for each cell by the total expression, multiplies this by a scale factor (10,000 by default), and log-transforms the result.
+
+pbmc <- NormalizeData(object = pbmc, normalization.method = "LogNormalize", 
+    scale.factor = 1000)
+
+```
 
 
+```{r revarygenes}
+pbmc <- FindVariableGenes(object = pbmc, mean.function = ExpMean, dispersion.function = LogVMR, 
+    x.low.cutoff = 0.0125, x.high.cutoff = 4, y.cutoff = 0.5)
+length(x = pbmc@var.genes)
+pbmc <- ScaleData(object = pbmc, vars.to.regress = c("nUMI", "percent.mito"))
+pbmc <- FindVariableGenes(object = pbmc, mean.function = ExpMean, dispersion.function = LogVMR, 
+    x.low.cutoff = 0.0125, x.high.cutoff = 4, y.cutoff = 0.5)
+length(x = pbmc@var.genes)
+paste("nUMI, percent.mito, these variables won't change the expression spectrum")
 
 
+pbmc <- RunPCA(object = pbmc, pc.genes = pbmc@var.genes, do.print = TRUE, pcs.print = 1:10, 
+    genes.print = 5)
+PCAPlot(object = pbmc, dim.1 = 1, dim.2 = 2)
+VizPCA(object = pbmc, pcs.use = 1:4)
+VizPCA(object = pbmc, pcs.use = 5:8)
+VizPCA(object = pbmc, pcs.use = 8:12)
 
+pbmc <- ProjectPCA(object = pbmc, do.print = FALSE)
+
+# NOTE: This process can take a long time for big datasets, comment out for
+# expediency.  More approximate techniques such as those implemented in
+# PCElbowPlot() can be used to reduce computation time
+pbmc <- JackStraw(object = pbmc, num.replicate = 100, display.progress = FALSE)
+JackStrawPlot(object = pbmc, PCs = 1:15)
+PCElbowPlot(object = pbmc)
+
+
+paste("Dimension: 9, resolution 1 was chosen before t-SNE")
+
+## rerun to choose clusters setting
+pbmc <- FindClusters(object = pbmc, reduction.type = "pca", dims.use = 1:9, 
+    resolution = 1, print.output = 0, save.SNN = TRUE)
+barplot(table(pbmc@ident), xlab = "Clusters", ylab = "Cell Counts")
+pbmc <- RunTSNE(object = pbmc, dims.use = 1:9, do.fast = TRUE)
+
+# note that you can set do.label=T to help label individual clusters
+plot1 <- TSNEPlot(object = pbmc, do.label=T)
+
+## You can save the object at this point so that it can easily be loaded back in without having to rerun the computationally intensive steps performed above, or easily shared with collaborators.
+
+saveRDS(pbmc, file = "~/Documents/Stats/7659Genetics/Proj/pbmc_GSM3374614.rds")
+
+# find all markers of cluster 1
+for(i in 0:4){
+cluster1.markers <- FindMarkers(object = pbmc, ident.1 = i, min.pct = 0.25)
+print(x = head(x = cluster1.markers, n = 5))
+if("PF4" %in% rownames(cluster1.markers)){
+  print(which(rownames(cluster1.markers %in% "PF4" )))
+}else{print("No")}
+}
+
+# you can plot raw UMI counts as well
+VlnPlot(object = pbmc, features.plot = c("PF4","PPBP"), use.raw = TRUE, y.log = TRUE)
+
+FeaturePlot(object = pbmc, features.plot = c("IL7R", "CD14", "LYZ","CD8A"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+FeaturePlot(object = pbmc, features.plot = c("MS4A1", "FCGR3A", "MS4A7"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+FeaturePlot(object = pbmc, features.plot = c("GNLY", "NKG7", "FCER1A", "CST3"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+
+FeaturePlot(object = pbmc, features.plot = c("PF4", "PPBP"), 
+            cols.use = c("grey", "blue"), 
+    reduction.use = "tsne")
+
+
+current.cluster.ids <- c(0, 1, 2, 3, 4)
+
+new.cluster.ids <- c("RPL13", "RPL21", "RPS8", "NK Cells", "Dendritic cells")
+pbmc@ident <- plyr::mapvalues(x = pbmc@ident, from = current.cluster.ids, to = new.cluster.ids)
+plot2 <- TSNEPlot(object = pbmc, do.label = TRUE, pt.size = 0.5)
+
+## save name 
+# First lets stash our identities for later
+pbmc <- StashIdent(object = pbmc, save.name = "ClusterNames_1_9")
+
+plot_grid(plot1, plot2)
+saveRDS(pbmc, file = "~/Documents/Stats/7659Genetics/Proj/pbmc_GSM3374614_final.rds")
+
+
+```
